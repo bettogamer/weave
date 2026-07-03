@@ -1,13 +1,17 @@
--- core/Core.lua — the reactive engine: signal, effect, batch. (computed and scope: next blocks.)
+-- core/Core.lua — the reactive engine: signal, computed, effect, batch, scope.
 -- PURE Lua 5.1: this file must not call any WoW API (ADR-0004).
 --
--- Model: while an effect runs, it registers itself as an observer of every signal it READS
--- (auto-tracking). Writing a signal enqueues its observers and runs them, re-tracking their
--- dependencies from scratch so deps always reflect the latest execution. `batch` defers the
--- runs to the end to coalesce writes.
+-- Model: while an effect (or a computed's formula) runs, it registers itself as an
+-- observer of every signal/computed it READS (auto-tracking), re-tracking from scratch on
+-- every run so deps always reflect the latest execution. Writing a signal marks dependent
+-- computeds dirty and enqueues dependent effects. The flush loop recomputes dirty computeds
+-- FIRST and only propagates further when their value actually changed (equality cut), then
+-- runs effects — draining computeds again after each one. This keeps updates glitch-free
+-- (diamond dependencies see one consistent generation) and lets unchanged computeds stop
+-- the propagation chain.
 --
 -- Performance contract (API-v0 §1): the set()→notify path allocates no new tables;
--- the queue and the dep/observer sets are reused.
+-- queues and dep/observer sets are reused.
 
 local Weave = LibStub("Weave-1.0", true)
 if not Weave or Weave.signal then return end -- duplicate copy: first one wins (v0)
@@ -15,22 +19,131 @@ if not Weave or Weave.signal then return end -- duplicate copy: first one wins (
 ------------------------------------------------------------------------------
 -- Internal graph state (per library copy)
 ------------------------------------------------------------------------------
-local currentObserver = nil -- effect whose fn is running (dependency collector)
+local currentObserver = nil -- effect or computed whose fn is running (dependency collector)
+local currentScope    = nil -- scope whose run() is active (ownership collector)
 local batchDepth      = 0   -- >0 = inside Weave.batch
 local flushing        = false
-local queue, queued   = {}, {} -- FIFO queue of pending effects + dedup set
+local eQueue, eQueued = {}, {} -- FIFO queue of pending effects + dedup set
+local cQueue, cQueued = {}, {} -- FIFO queue of dirty computeds + dedup set
+
+local function rawEquals(a, b) return a == b end
 
 ------------------------------------------------------------------------------
--- Effects
+-- Dependency tracking (shared by effects and computeds)
 ------------------------------------------------------------------------------
-local function untrackDeps(eff)
-  local deps = eff._deps
+local function untrackDeps(node)
+  local deps = node._deps
   for i = #deps, 1, -1 do
-    deps[i]._observers[eff] = nil
+    deps[i]._observers[node] = nil
     deps[i] = nil
   end
 end
 
+-- Registers `dep` (signal or computed) as a dependency of the running observer.
+local function trackRead(dep)
+  local obs = currentObserver
+  if obs and not dep._observers[obs] then
+    dep._observers[obs] = true
+    obs._deps[#obs._deps + 1] = dep
+  end
+end
+
+local flush -- forward declaration
+
+-- Enqueues the observers of `node` after its value changed. `skip` avoids re-scheduling
+-- the observer that is pulling the fresh value right now.
+local function scheduleObservers(node, skip)
+  for obs in pairs(node._observers) do
+    if obs ~= skip then
+      if obs._isComputed then
+        obs._dirty = true
+        if not cQueued[obs] then
+          cQueued[obs] = true
+          cQueue[#cQueue + 1] = obs
+        end
+      elseif not obs._disposed and not eQueued[obs] then
+        eQueued[obs] = true
+        eQueue[#eQueue + 1] = obs
+      end
+    end
+  end
+  if batchDepth == 0 then flush() end
+end
+
+------------------------------------------------------------------------------
+-- Computeds (lazy + cached; recomputed via the queue or pulled on read)
+------------------------------------------------------------------------------
+-- Recomputes `c` and returns whether its value changed. Caller decides propagation.
+local function recompute(c)
+  untrackDeps(c)
+  c._computing = true
+  local prev = currentObserver
+  currentObserver = c
+  local ok, result = pcall(c._fn)
+  currentObserver = prev
+  c._computing = false
+  if not ok then
+    c._dirty = true -- stay dirty so a later read retries
+    error(result, 0)
+  end
+  c._dirty = false
+  local okEq, same = pcall(rawEquals, c._value, result)
+  c._value = result
+  return not (okEq and same)
+end
+
+local ComputedMT
+
+local function readComputed(c)
+  if c._computing then
+    error("Weave.computed: cycle detected — the formula reads itself (directly or through another computed)", 2)
+  end
+  trackRead(c)
+  if c._dirty then
+    -- pull: the reader needs a fresh value NOW; other observers get scheduled normally
+    if recompute(c) then scheduleObservers(c, currentObserver) end
+  end
+  return c._value
+end
+
+local ComputedMethods = {}
+
+function ComputedMethods:peek()
+  if self._dirty and not self._computing then
+    if recompute(self) then scheduleObservers(self, nil) end
+  end
+  return self._value
+end
+
+function ComputedMethods:isSecret()
+  return self._secret == true
+end
+
+ComputedMT = { __call = readComputed, __index = ComputedMethods }
+
+function Weave.computed(fn, opts)
+  if type(fn) ~= "function" then
+    error("Weave.computed: expected a function, got " .. type(fn), 2)
+  end
+  if opts ~= nil and type(opts) ~= "table" then
+    error("Weave.computed: opts must be a table, got " .. type(opts), 2)
+  end
+  return setmetatable({
+    _isComputed = true,
+    _fn         = fn,
+    _value      = nil,
+    _dirty      = true,  -- lazy: first read computes
+    _computing  = false,
+    _observers  = {},
+    _deps       = {},
+    _fallback   = opts and opts.fallback or nil,
+    _secret     = false,
+  }, ComputedMT)
+end
+
+------------------------------------------------------------------------------
+-- Effects
+------------------------------------------------------------------------------
 local function runEffect(eff)
   if eff._disposed then return end
   untrackDeps(eff) -- re-tracking: deps are rebuilt on every run
@@ -41,31 +154,43 @@ local function runEffect(eff)
   if not ok then error(err, 0) end
 end
 
-local function flush()
-  if flushing then return end
-  flushing = true
-  local firstErr = nil
+-- Recomputes every queued dirty computed, propagating only real changes.
+-- Returns the first error (if any) instead of throwing, so flush can finish.
+local function drainComputeds(firstErr)
   local i = 0
-  while i < #queue do -- effects may enqueue more (cascades): the while picks them up
+  while i < #cQueue do -- propagation may enqueue more: the while picks them up
     i = i + 1
-    local eff = queue[i]
-    queued[eff] = nil
-    local ok, err = pcall(runEffect, eff)
-    if not ok and firstErr == nil then firstErr = err end
-  end
-  for j = #queue, 1, -1 do queue[j] = nil end
-  flushing = false
-  if firstErr ~= nil then error(firstErr, 0) end
-end
-
-local function scheduleObservers(sig)
-  for eff in pairs(sig._observers) do
-    if not eff._disposed and not queued[eff] then
-      queued[eff] = true
-      queue[#queue + 1] = eff
+    local c = cQueue[i]
+    cQueued[c] = nil
+    if c._dirty then
+      local ok, changed = pcall(recompute, c)
+      if not ok then
+        if firstErr == nil then firstErr = changed end
+      elseif changed then
+        scheduleObservers(c, nil)
+      end
     end
   end
-  if batchDepth == 0 then flush() end
+  for j = #cQueue, 1, -1 do cQueue[j] = nil end
+  return firstErr
+end
+
+flush = function()
+  if flushing then return end
+  flushing = true
+  local firstErr = drainComputeds(nil)
+  local i = 0
+  while i < #eQueue do -- effects may enqueue more (cascades): the while picks them up
+    i = i + 1
+    local eff = eQueue[i]
+    eQueued[eff] = nil
+    local ok, err = pcall(runEffect, eff)
+    if not ok and firstErr == nil then firstErr = err end
+    firstErr = drainComputeds(firstErr) -- keep computeds fresh between effects
+  end
+  for j = #eQueue, 1, -1 do eQueue[j] = nil end
+  flushing = false
+  if firstErr ~= nil then error(firstErr, 0) end
 end
 
 local EffectMT = {
@@ -80,9 +205,13 @@ local EffectMT = {
 
 function Weave.effect(fn)
   if type(fn) ~= "function" then
-    error("Weave.effect: se esperaba una function, llegó " .. type(fn), 2)
+    error("Weave.effect: expected a function, got " .. type(fn), 2)
   end
   local eff = setmetatable({ _fn = fn, _deps = {}, _disposed = false }, EffectMT)
+  if currentScope then
+    local items = currentScope._items
+    items[#items + 1] = eff
+  end
   runEffect(eff)
   return eff
 end
@@ -92,14 +221,8 @@ end
 ------------------------------------------------------------------------------
 local SignalMT -- forward declaration (needed by the set() guard)
 
-local function rawEquals(a, b) return a == b end
-
 local function readSignal(sig)
-  local obs = currentObserver
-  if obs and not sig._observers[obs] then
-    sig._observers[obs] = true
-    obs._deps[#obs._deps + 1] = sig
-  end
+  trackRead(sig)
   return sig._value
 end
 
@@ -107,14 +230,14 @@ local SignalMethods = {}
 
 function SignalMethods:set(v)
   if getmetatable(self) ~= SignalMT then
-    error("Weave: usa señal:set(v) (con dos puntos), no señal.set(v)", 2)
+    error("Weave: use signal:set(v) with a colon, not signal.set(v)", 2)
   end
   -- did it really change? protected compare: if comparing throws (secret values), assume it changed
   local eq = self._equals or rawEquals
   local ok, same = pcall(eq, self._value, v)
   if ok and same then return end
   self._value = v
-  scheduleObservers(self)
+  scheduleObservers(self, nil)
 end
 
 function SignalMethods:peek()
@@ -129,10 +252,10 @@ SignalMT = { __call = readSignal, __index = SignalMethods }
 
 function Weave.signal(initial, opts)
   if opts ~= nil and type(opts) ~= "table" then
-    error("Weave.signal: opts debe ser una tabla, llegó " .. type(opts), 2)
+    error("Weave.signal: opts must be a table, got " .. type(opts), 2)
   end
   if opts and opts.equals ~= nil and type(opts.equals) ~= "function" then
-    error("Weave.signal: opts.equals debe ser una function", 2)
+    error("Weave.signal: opts.equals must be a function", 2)
   end
   return setmetatable({
     _value     = initial,
@@ -148,7 +271,7 @@ end
 ------------------------------------------------------------------------------
 function Weave.batch(fn)
   if type(fn) ~= "function" then
-    error("Weave.batch: se esperaba una function, llegó " .. type(fn), 2)
+    error("Weave.batch: expected a function, got " .. type(fn), 2)
   end
   batchDepth = batchDepth + 1
   local ok, err = pcall(fn)
@@ -158,4 +281,39 @@ function Weave.batch(fn)
     if ok and not okFlush then error(errFlush, 0) end
   end
   if not ok then error(err, 0) end
+end
+
+------------------------------------------------------------------------------
+-- Scopes (collective ownership of effects; WoW has no unmount, disposal is explicit)
+------------------------------------------------------------------------------
+local ScopeMT = {
+  __index = {
+    run = function(self, fn)
+      if self._disposed then
+        error("Weave.scope: this scope was already disposed; create a new one", 2)
+      end
+      if type(fn) ~= "function" then
+        error("Weave.scope: run() expected a function, got " .. type(fn), 2)
+      end
+      local prev = currentScope
+      currentScope = self
+      local ok, result = pcall(fn)
+      currentScope = prev
+      if not ok then error(result, 0) end
+      return result
+    end,
+    dispose = function(self)
+      if self._disposed then return end
+      self._disposed = true
+      local items = self._items
+      for i = #items, 1, -1 do
+        items[i]:dispose()
+        items[i] = nil
+      end
+    end,
+  },
+}
+
+function Weave.scope()
+  return setmetatable({ _items = {}, _disposed = false }, ScopeMT)
 end
