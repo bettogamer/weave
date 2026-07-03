@@ -6,7 +6,7 @@ color           = true
 globals = {
     -- Solo la capa wow/ puede usar globals de WoW; core/ no debería necesitar NINGUNO.
     "CreateFrame", "UIParent", "GetTime", "InCombatLockdown",
-    "C_Timer",
+    "C_Timer", "C_AddOns",
     "issecretvalue", "issecrettable",
     "print",
     "LibStub",

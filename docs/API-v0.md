@@ -203,8 +203,13 @@ Weave.bind(frame, "scale", db.scale)
 ```
 
 - **Timing:** el store se hidrata en `ADDON_LOADED` del addon dueño; `Weave.store` puede
-  llamarse antes (devuelve defaults y re-sincroniza al hidratar). Recomendación estándar:
-  crearlo en el `ADDON_LOADED` de `Core.lua`.
+  llamarse antes (devuelve defaults y re-sincroniza al hidratar — los effects/binds
+  enchufados se enteran solos). `opts.addon = "MiAddon"` nombra al dueño (exacto,
+  recomendado — WoW pasa `local addonName = ...` a cada archivo); sin él, se asume que
+  el SIGUIENTE `ADDON_LOADED` es el del dueño (válido para el patrón file-scope). Al
+  hidratar, **lo guardado gana** a escrituras pre-hidratación; en primera ejecución las
+  escrituras tempranas sobreviven. Recomendación estándar: crearlo en el `ADDON_LOADED`
+  de `Core.lua`.
 - **Defaults sin pisar** lo guardado; claves guardadas que ya no están en defaults se
   preservan (datos del usuario nunca se borran — regla del estándar). **Los defaults NO
   se materializan en la SV**: solo persiste lo que se escribe explícitamente (estilo
