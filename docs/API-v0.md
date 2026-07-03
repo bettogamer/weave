@@ -216,7 +216,14 @@ Weave.bind(frame, "scale", db.scale)
   AceDB) — cambiar un default en una versión nueva alcanza a quien nunca lo tocó.
 - `db._raw` — acceso de escape a la tabla SavedVariables cruda (para export/debug); es
   LA MISMA tabla que la global, sin copias. Claves de defaults: strings que no empiecen
-  por `_` (reservado).
+  por `_` (reservado: `_version` es la única clave que Weave escribe por su cuenta).
+- **Anidados**: una tabla en defaults crea un sub-store; su sub-tabla en la SV se
+  materializa solo al escribir. Si lo guardado bajo esa clave no es una tabla (formato
+  viejo/corrupto), valen los defaults y la primera escritura la repara.
+- **`version`/`migrate`**: `migrate(raw, oldVersion)` corre en la hidratación, ANTES del
+  re-sync (los lectores solo ven datos ya convertidos), y solo sobre datos preexistentes
+  con versión distinta (`oldVersion` es `nil` en datos pre-versionado); primera ejecución
+  solo estampa `_version`.
 - Solo tipos serializables por WoW (boolean/number/string/table); `set()` con otro tipo
   → error claro. **Un secret jamás se persiste**: `set(secret)` en un campo de store
   avisa suave y salta la escritura (señal y SV intactas).
