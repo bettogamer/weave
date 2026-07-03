@@ -56,6 +56,18 @@ function M.frameCount()
   return #frames
 end
 
+local now -- fake clock, reset by loadWeaveWow()
+
+--- Advances the fake clock and fires every OnUpdate script once, with `dt` as the
+--- elapsed seconds (one advanceTime call = one rendered frame of `dt` seconds).
+function M.advanceTime(dt)
+  now = now + dt
+  for _, f in ipairs(frames) do
+    local onUpdate = f._scripts.OnUpdate
+    if onUpdate then onUpdate(f, dt) end
+  end
+end
+
 --- Fires a game event: dispatches to every mock frame registered for it, honoring
 --- RegisterUnitEvent filters (for unit events the first vararg is the unit).
 function M.fireEvent(event, ...)
@@ -77,6 +89,7 @@ end
 local WOW_FILES = {
   "Weave/wow/Events.lua",
   "Weave/wow/Props.lua",
+  "Weave/wow/Ticker.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.
@@ -90,6 +103,8 @@ function M.loadWeaveWow(opts)
     return f
   end
   _G.issecretvalue = opts and opts.issecretvalue or nil
+  now = 1000 -- arbitrary non-zero start, so specs can't rely on time starting at 0
+  _G.GetTime = function() return now end
   return core.loadWeave(WOW_FILES)
 end
 

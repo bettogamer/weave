@@ -108,14 +108,20 @@ Weave.props.register("glow", function(frame, v) --[[ aplicar ]] end)
 
 ### `Weave.onUpdate(interval) → Signal`
 
-Señal de tiempo throttleada (ticker compartido) para countdowns/duraciones. `interval` en
-segundos (mín. efectivo ~0.05). Solo tickea si tiene suscriptores vivos.
+Señal de tiempo throttleada (un único frame ticker compartido) para countdowns/duraciones.
+`interval` en segundos (mín. efectivo ~0.05). Su valor es el `GetTime()` del último tick;
+nace sembrada con la hora actual. Solo tickea si tiene suscriptores vivos, y **el mismo
+intervalo devuelve la misma señal** (se comparte).
 
 ### Chokepoint de errores (automático, ADR-0003)
 
-Todo effect/bind corre bajo un handler: error cuyo mensaje contiene `"a secret"` o
-`"ForceTaint_Strong"` → ese effect degrada (una advertencia soft por sitio, no popup, y el
-computed fuente expone su `fallback` si lo tiene). Cualquier otro error se propaga intacto.
+Todo effect (y por tanto todo bind) corre bajo un handler **en el core**: si el error
+contiene `"a secret"` o `"ForceTaint_Strong"`, el effect degrada — se traga el error,
+conserva sus dependencias (revive solo cuando vuelven valores normales) y avisa **una vez
+por sitio**. Cualquier otro error se propaga intacto. La parte visible del aviso la inyecta
+la capa wow con `Weave._setSecretWarning(fn)` (mismo patrón que el detector, §3); headless
+la degradación es silenciosa. Limitación conocida: un fn que explota antes de leer ninguna
+señal queda sin dependencias y no revive.
 
 ## 3. Semántica taint (tabla de verdad — ADR-0003)
 

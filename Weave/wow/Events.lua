@@ -12,6 +12,12 @@ if issecretvalue then
   Weave._setSecretDetector(issecretvalue)
 end
 
+-- Visible side of the effect chokepoint (ADR-0003): one soft chat line per degraded
+-- site, never the red error popup. The once-per-site accounting lives in the core.
+Weave._setSecretWarning(function(err)
+  print("|cffffd100Weave:|r an effect degraded on a secret value (12.0 taint): " .. tostring(err))
+end)
+
 -- Default map: the signal takes the event's first argument.
 local function firstArg(first) return first end
 
