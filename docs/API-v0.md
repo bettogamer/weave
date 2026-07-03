@@ -89,8 +89,10 @@ local hp = Weave.fromUnitEvent("UNIT_HEALTH", "player",
 
 ### `Weave.bind(frame, prop, source) → EffectHandle`
 
-Azúcar sobre `effect`: conecta una señal/computed a una propiedad del frame vía el registro
-de props. **Nunca crea frames** (combat-safe; el frame ya existe).
+Azúcar sobre `effect`: conecta una señal/computed (o cualquier llamable) a una propiedad
+del frame vía el registro de props. **Nunca crea frames** (combat-safe; el frame ya
+existe). Las props de varios args (`minMax`, `vertexColor`, `statusBarColor`) reciben una
+tabla y la desempaquetan: `W.signal({ 0, 1 })` → `SetMinMaxValues(0, 1)`.
 
 ```lua
 Weave.bind(bar, "value", pct)

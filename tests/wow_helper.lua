@@ -30,7 +30,30 @@ local function newFrame()
   function f:GetScript(handler) return self._scripts[handler] end
   function f:Hide() end
   function f:Show() end
+  -- Prop setters: they only RECORD what was applied (specs read f._set.<prop>);
+  -- the mock asserts nothing about rendering, just that the right call happened.
+  f._set = {}
+  function f:SetText(v)  self._set.text  = v end
+  function f:SetValue(v) self._set.value = v end
+  function f:SetMinMaxValues(min, max) self._set.minMax = { min, max } end
+  function f:SetShown(v) self._set.shown = v end
+  function f:SetAlpha(v) self._set.alpha = v end
+  function f:SetWidth(v)  self._set.width  = v end
+  function f:SetHeight(v) self._set.height = v end
+  function f:SetTexture(v) self._set.texture = v end
+  function f:SetVertexColor(r, g, b, a) self._set.vertexColor = { r, g, b, a } end
+  function f:SetStatusBarColor(r, g, b, a) self._set.statusBarColor = { r, g, b, a } end
   return f
+end
+
+--- Creates a standalone mock frame for bind() specs (not registered for events).
+function M.newMockFrame()
+  return newFrame()
+end
+
+--- How many frames the library has created so far (bind must NEVER create frames).
+function M.frameCount()
+  return #frames
 end
 
 --- Fires a game event: dispatches to every mock frame registered for it, honoring
@@ -53,6 +76,7 @@ end
 -- wow/ layer files in load order (will mirror the .toc)
 local WOW_FILES = {
   "Weave/wow/Events.lua",
+  "Weave/wow/Props.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.
