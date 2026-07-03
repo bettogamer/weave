@@ -1,0 +1,8 @@
+## Interface: 120007
+## Title: WeaveDemo
+## Notes: Minimal Weave demo (M1): a reactive player health bar
+## Author: Alberto Gomez
+## Version: 0.1.0-dev
+## Dependencies: Weave
+
+Demo.lua
