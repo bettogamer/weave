@@ -1,0 +1,10 @@
+related-addons/
+*.zip
+.claude/settings.local.json
+CLAUDE.local.md
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
