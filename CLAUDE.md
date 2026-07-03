@@ -6,25 +6,29 @@
 
 ## Estado actual (handoff — actualizar al cerrar cada sesión)
 
-- **M2 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): taint end-to-end. Guard de secrets
-  en los maps de eventos (tercer y último punto de entrada de código de usuario;
-  `Weave._isSecretError` compartido core→wow) + `/weavetaint` (`demo/WeaveDemo/
-  TaintTest.lua`): pipeline completo construido dentro de `loadstring` bajo
-  ForceTaint_Strong con secrets REALES — barra pintando vida real, texto "?? (taint)",
-  guards avisando una vez por sitio, CERO popups. **97 tests en verde, 0 warnings,
-  taintlint limpio** (los 2 INFO SV010 de la demo son intencionales: propagación
-  deliberada al sink). M1 detrás: capa `wow/` entera + Weave standalone + demo +
-  deploy-local. `dev` mergeado a `main`.
-- **Hallazgo clave 12.0.7** (verificado in-game): `UnitHealth`/`UnitHealthMax` devuelven
-  secret SIEMPRE en código de addon → un fallback numérico da "0%" permanente. Patrón:
-  señal SIN fallback → secret directo a los sinks (`SetValue`/`SetMinMaxValues` los
-  aceptan); texto/color con `isSecret()` → "??". Ver AGENTS.md §9 y CLAUDE.md global.
-- **Siguiente: M3 — `Weave/store/`** (leer API-v0 §5 antes de proponer bloques):
-  SavedVariables reactivas — hidratación en `ADDON_LOADED` del addon dueño (llamable
-  antes: defaults y re-sync al hidratar), defaults sin pisar lo guardado, claves
-  desconocidas se preservan (datos del usuario intocables), sub-stores anidados,
-  `version`/`migrate`, `_raw`. Testing headless: SV simulada como global fake +
-  disparar `ADDON_LOADED` con el mock de eventos de `tests/wow_helper.lua`.
+- **M3 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): `Weave/store/Store.lua` entero —
+  SavedVariables reactivas (cada campo señal, write-through a la tabla que WoW
+  serializa), coreografía de hidratación (staging → re-adopción en `ADDON_LOADED` →
+  re-sync en vivo; lo guardado gana; primera ejecución reclama), sub-stores anidados
+  (sub-tablas materializadas solo al escribir), `version`/`migrate` (antes del re-sync),
+  defaults NUNCA a disco, secrets JAMÁS se persisten (aviso y skip). Demo: `/weavewidth`
+  persistente verificado (sobrevive /reload y logout). **133 tests en verde, 0 warnings,
+  taintlint limpio** (2 INFO SV010 intencionales en la demo). Detrás: M2 (taint
+  end-to-end bajo ForceTaint, `/weavetaint`), M1 (capa wow + demo + deploy-local).
+  `dev` mergeado a `main`.
+- **Hallazgos clave 12.0.7** (verificados in-game, detalle en AGENTS.md §9 y CLAUDE.md
+  global): (1) `UnitHealth`/`UnitHealthMax` son secret SIEMPRE en código de addon →
+  patrón sink-directo + `isSecret()` → "??". (2) `C_AddOns.IsAddOnLoaded(owner)` es true
+  DURANTE la carga del propio addon → con la global nil, vigilar SIEMPRE el ADDON_LOADED
+  del dueño y re-adoptar (el fix auto-curativo del store).
+- **Siguiente: M4 — `Weave/ui/`** (leer API-v0 §4 antes de proponer bloques):
+  `Weave.new(frameType, props)` — crea el frame Y aplica/bindea props en una sola
+  descripción (literal → una vez; señal/computed → bind). MISMO registro de props que
+  `bind` (una sola verdad). Props especiales: `parent`, `template`, `name`, `size`,
+  `point`/`points`, `layer`, `[Weave.children]`, `[Weave.on]` (scripts). Restricción
+  DURA: `Weave.new` en combate → error dev / no-op con warning (AGENTS §5). Elementos
+  creados en `scope:run()` se adscriben al scope. Cierre del hito: la demo canónica
+  COMPLETA de §7 in-game (~20 líneas, cero handlers).
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 

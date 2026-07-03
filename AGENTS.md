@@ -3,12 +3,12 @@
 > README ejecutable para agentes de IA. Fuente de verdad única: si cambia una decisión,
 > este archivo y el ADR correspondiente se actualizan en el mismo commit.
 >
-> **Estado del proyecto: IMPLEMENTACIÓN.** **M2 COMPLETO**: taint end-to-end verificado
-> in-game bajo ForceTaint_Strong (`/weavetaint`: pipeline entero con secrets reales,
-> guards degradando con aviso suave, CERO popups). Los 3 puntos de entrada de código de
-> usuario protegidos (fórmulas de computed, effects/binds, maps de eventos). 97 tests
-> headless en verde, 0 warnings, taintlint limpio. Siguiente entregable: **M3 —
-> `store/`** (SavedVariables reactivas, API-v0 §5).
+> **Estado del proyecto: IMPLEMENTACIÓN.** **M3 COMPLETO**: `store/` entero
+> (SavedVariables reactivas: write-through, hidratación con ADDON_LOADED, sub-stores
+> anidados, version/migrate, secrets nunca a disco) — persistencia verificada in-game
+> (`/weavewidth` sobrevive a /reload y logout). 133 tests headless en verde, 0 warnings,
+> taintlint limpio. Siguiente entregable: **M4 — `ui/`** (`Weave.new`: creación
+> declarativa de frames, API-v0 §4; cierra con la demo canónica completa de §7).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -125,3 +125,4 @@
 | v0.3 | 2026-07-03 | **M0 completo**: core entero con 49 tests (mini-runner propio, busted queda para CI). Git creado (identidad Betto, sin trailers de IA), licencia MIT, mensajes de error de la API en inglés, enganche `_setSecretDetector` documentado en API-v0 §3. |
 | v0.4 | 2026-07-03 | **M1 completo**: capa `wow/` entera (91 tests) + Weave empaquetada standalone (toc/xml, LibStub vendoreado) + WeaveDemo verificada in-game. Hallazgo 12.0.7: UnitHealth/UnitHealthMax secret SIEMPRE en código de addon → patrón sink-directo (§9). taintlint corre local (Node 24 LTS instalado). |
 | v0.5 | 2026-07-03 | **M2 completo**: guard de secrets en maps de eventos (`_isSecretError` compartido core→wow; 97 tests) + `/weavetaint` verificado in-game — pipeline entero bajo ForceTaint_Strong con secrets reales, cero popups. |
+| v0.6 | 2026-07-03 | **M3 completo**: `store/` entero (133 tests) + persistencia verificada in-game. Bug real cazado: IsAddOnLoaded true durante la carga del propio addon (§9). Defaults nunca a disco; `_version` única clave propia; secrets jamás se persisten. |
