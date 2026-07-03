@@ -29,6 +29,27 @@ local cQueue, cQueued = {}, {} -- FIFO queue of dirty computeds + dedup set
 local function rawEquals(a, b) return a == b end
 
 ------------------------------------------------------------------------------
+-- Secret values (WoW 12.0+) — core side of ADR-0003
+-- The core is pure Lua, so it cannot call issecretvalue directly: the wow/ layer
+-- injects it here. Without injection nothing is secret (safe default, old clients).
+------------------------------------------------------------------------------
+local secretDetector = function() return false end
+
+function Weave._setSecretDetector(fn)
+  if type(fn) ~= "function" then
+    error("Weave._setSecretDetector: expected a function, got " .. type(fn), 2)
+  end
+  secretDetector = fn
+end
+
+-- Recognizes the client's secret-value error wording (chokepoint pattern, ADR-0003).
+local function isSecretError(msg)
+  msg = tostring(msg)
+  return msg:find("a secret", 1, true) ~= nil
+      or msg:find("ForceTaint_Strong", 1, true) ~= nil
+end
+
+------------------------------------------------------------------------------
 -- Dependency tracking (shared by effects and computeds)
 ------------------------------------------------------------------------------
 local function untrackDeps(node)
@@ -83,10 +104,21 @@ local function recompute(c)
   currentObserver = prev
   c._computing = false
   if not ok then
-    c._dirty = true -- stay dirty so a later read retries
+    if isSecretError(result) then
+      -- degrade, never crash (API-v0 §3 row 4): declared fallback, or last good value
+      c._dirty = false
+      c._secret = true
+      local newVal = c._value
+      if c._fallback ~= nil then newVal = c._fallback end
+      local okEq, same = pcall(rawEquals, c._value, newVal)
+      c._value = newVal
+      return not (okEq and same)
+    end
+    c._dirty = true -- non-secret error: stay dirty so a later read retries, and propagate
     error(result, 0)
   end
   c._dirty = false
+  c._secret = secretDetector(result) and true or false
   local okEq, same = pcall(rawEquals, c._value, result)
   c._value = result
   return not (okEq and same)
@@ -232,11 +264,17 @@ function SignalMethods:set(v)
   if getmetatable(self) ~= SignalMT then
     error("Weave: use signal:set(v) with a colon, not signal.set(v)", 2)
   end
+  -- secret handling (API-v0 §3): with a declared fallback readers see the fallback;
+  -- without one the secret flows as-is (for sinks that accept secrets)
+  local secret = secretDetector(v) and true or false
+  local effective = v
+  if secret and self._fallback ~= nil then effective = self._fallback end
   -- did it really change? protected compare: if comparing throws (secret values), assume it changed
   local eq = self._equals or rawEquals
-  local ok, same = pcall(eq, self._value, v)
+  local ok, same = pcall(eq, self._value, effective)
+  self._secret = secret
   if ok and same then return end
-  self._value = v
+  self._value = effective
   scheduleObservers(self, nil)
 end
 
