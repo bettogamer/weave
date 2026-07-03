@@ -7,7 +7,14 @@
 --   * text/color: arithmetic on a secret is impossible — read the raw signal (for
 --     tracking), check isSecret(), and degrade to "??" / a neutral color.
 
+local ADDON = ... -- WoW passes (addonName, addonTable) to every file
+
 local W = LibStub("Weave-1.0")
+
+-- PERSISTENT STATE (M3): created at file scope, BEFORE the SV loads — it starts
+-- on defaults and re-syncs (bar width included) when ADDON_LOADED hydrates it.
+-- The .toc declares: ## SavedVariables: WeaveDemoDB
+local db = W.store("WeaveDemoDB", { width = 220 }, { addon = ADDON, version = 1 })
 
 -- STATE: no fallback declared — the secret circulates as-is (API-v0 §3, row 3)
 local hp = W.fromUnitEvent("UNIT_HEALTH", "player",
@@ -32,14 +39,28 @@ end, { fallback = { 0.2, 0.8, 0.2 } })
 
 -- VIEW: created once, out of combat (declarative creation via W.new arrives in M4)
 local bar = CreateFrame("StatusBar", "WeaveDemoBar", UIParent)
-bar:SetSize(220, 22)
+bar:SetHeight(22)
 bar:SetPoint("CENTER", 0, -180)
 bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
 
 local label = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 label:SetPoint("CENTER")
 
+W.bind(bar, "width", db.width) -- persistent: survives /reload and logout
 W.bind(bar, "minMax", range)
 W.bind(bar, "value", hp) -- the secret goes straight into the sink: real fill
 W.bind(bar, "statusBarColor", color)
 W.bind(label, "text", text)
+
+-- /weavewidth <n>: the in-game knob to verify persistence (M3 success criterion)
+SLASH_WEAVEWIDTH1 = "/weavewidth"
+SlashCmdList.WEAVEWIDTH = function(msg)
+  local n = tonumber(msg)
+  if n and n >= 50 and n <= 600 then
+    db.width:set(n)
+    print("|cff44ff44WeaveDemo:|r width = " .. n .. " — persists across /reload and logout")
+  else
+    print("|cffffd100WeaveDemo:|r usage: /weavewidth <50-600> (current: "
+      .. tostring(db.width:peek()) .. ")")
+  end
+end

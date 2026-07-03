@@ -6,13 +6,13 @@ color           = true
 globals = {
     -- Solo la capa wow/ puede usar globals de WoW; core/ no debería necesitar NINGUNO.
     "CreateFrame", "UIParent", "GetTime", "InCombatLockdown",
-    "C_Timer",
+    "C_Timer", "C_AddOns",
     "issecretvalue", "issecrettable",
     "print",
     "LibStub",
     -- APIs del juego usadas por la demo (demo/):
     "UnitHealth", "UnitHealthMax",
-    "SLASH_WEAVETAINT1", "SlashCmdList",
+    "SLASH_WEAVETAINT1", "SLASH_WEAVEWIDTH1", "SlashCmdList",
 }
 
 ignore = {

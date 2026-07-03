@@ -53,6 +53,11 @@ end
 -- counts as a secret-shaped error.
 Weave._isSecretError = isSecretError
 
+-- Shared with outer layers (store): query the injected detector directly.
+function Weave._isSecret(v)
+  return secretDetector(v) and true or false
+end
+
 -- Visible soft warning for degraded effects, injected by the wow/ layer (print).
 -- Headless / not injected: degradation is silent.
 local secretWarning = nil

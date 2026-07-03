@@ -3,12 +3,12 @@
 > README ejecutable para agentes de IA. Fuente de verdad única: si cambia una decisión,
 > este archivo y el ADR correspondiente se actualizan en el mismo commit.
 >
-> **Estado del proyecto: IMPLEMENTACIÓN.** **M2 COMPLETO**: taint end-to-end verificado
-> in-game bajo ForceTaint_Strong (`/weavetaint`: pipeline entero con secrets reales,
-> guards degradando con aviso suave, CERO popups). Los 3 puntos de entrada de código de
-> usuario protegidos (fórmulas de computed, effects/binds, maps de eventos). 97 tests
-> headless en verde, 0 warnings, taintlint limpio. Siguiente entregable: **M3 —
-> `store/`** (SavedVariables reactivas, API-v0 §5).
+> **Estado del proyecto: IMPLEMENTACIÓN.** **M3 COMPLETO**: `store/` entero
+> (SavedVariables reactivas: write-through, hidratación con ADDON_LOADED, sub-stores
+> anidados, version/migrate, secrets nunca a disco) — persistencia verificada in-game
+> (`/weavewidth` sobrevive a /reload y logout). 133 tests headless en verde, 0 warnings,
+> taintlint limpio. Siguiente entregable: **M4 — `ui/`** (`Weave.new`: creación
+> declarativa de frames, API-v0 §4; cierra con la demo canónica completa de §7).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -103,6 +103,14 @@
   señal **sin** fallback bindeada directo al sink que acepta secrets
   (`SetValue`/`SetMinMaxValues`), y el texto/color derivado comprueba `isSecret()` y degrada
   ("??" / color neutro). _Demo M1 (2026-07-03)._
+- **El ancho persistido "vuelve al default" tras /reload** → `C_AddOns.IsAddOnLoaded(owner)`
+  devuelve `true` DURANTE la ejecución de los archivos del propio addon (antes de que su
+  SavedVariable cargue), así que la vía rápida "dueño ya cargado → reclama la global ya"
+  reclamaba una tabla vacía que WoW pisaba después al cargar la SV; el store quedaba ciego
+  en su tabla huérfana → patrón correcto: con la global `nil`, reclamar si hace falta pero
+  SIEMPRE seguir vigilando el `ADDON_LOADED` del dueño y re-adoptar lo que haya en la
+  global al llegar (auto-curativo bajo cualquier semántica de IsAddOnLoaded). _Store M3,
+  visto in-game (2026-07-03)._
 - **Tests de tiempo: nunca comparar contra literales decimales** → `1000 + 0.06 + 0.06 ≠
   1000.12` en coma flotante (el runner muestra "esperado 1000.12, obtenido 1000.12") →
   comparar contra la MISMA aritmética que hace el código (`t0 + dt1 + dt2`). _ticker_spec
@@ -117,3 +125,4 @@
 | v0.3 | 2026-07-03 | **M0 completo**: core entero con 49 tests (mini-runner propio, busted queda para CI). Git creado (identidad Betto, sin trailers de IA), licencia MIT, mensajes de error de la API en inglés, enganche `_setSecretDetector` documentado en API-v0 §3. |
 | v0.4 | 2026-07-03 | **M1 completo**: capa `wow/` entera (91 tests) + Weave empaquetada standalone (toc/xml, LibStub vendoreado) + WeaveDemo verificada in-game. Hallazgo 12.0.7: UnitHealth/UnitHealthMax secret SIEMPRE en código de addon → patrón sink-directo (§9). taintlint corre local (Node 24 LTS instalado). |
 | v0.5 | 2026-07-03 | **M2 completo**: guard de secrets en maps de eventos (`_isSecretError` compartido core→wow; 97 tests) + `/weavetaint` verificado in-game — pipeline entero bajo ForceTaint_Strong con secrets reales, cero popups. |
+| v0.6 | 2026-07-03 | **M3 completo**: `store/` entero (133 tests) + persistencia verificada in-game. Bug real cazado: IsAddOnLoaded true durante la carga del propio addon (§9). Defaults nunca a disco; `_version` única clave propia; secrets jamás se persisten. |

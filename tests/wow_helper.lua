@@ -78,9 +78,21 @@ function M.advanceTime(dt)
   end
 end
 
+local addonsLoaded -- set of addon names already "loaded", reset by loadWeaveWow()
+
+--- Marks an addon as already loaded WITHOUT firing ADDON_LOADED (for specs where
+--- the store is created after its owner finished loading).
+function M.setAddOnLoaded(name)
+  addonsLoaded[name] = true
+end
+
 --- Fires a game event: dispatches to every mock frame registered for it, honoring
 --- RegisterUnitEvent filters (for unit events the first vararg is the unit).
+--- ADDON_LOADED also marks that addon as loaded, like the real client.
 function M.fireEvent(event, ...)
+  if event == "ADDON_LOADED" then
+    addonsLoaded[(...)] = true
+  end
   for _, f in ipairs(frames) do
     local reg = f._events[event]
     if reg then
@@ -100,6 +112,7 @@ local WOW_FILES = {
   "Weave/wow/Events.lua",
   "Weave/wow/Props.lua",
   "Weave/wow/Ticker.lua",
+  "Weave/store/Store.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.
@@ -115,6 +128,10 @@ function M.loadWeaveWow(opts)
   _G.issecretvalue = opts and opts.issecretvalue or nil
   now = 1000 -- arbitrary non-zero start, so specs can't rely on time starting at 0
   _G.GetTime = function() return now end
+  addonsLoaded = {}
+  _G.C_AddOns = {
+    IsAddOnLoaded = function(name) return addonsLoaded[name] == true end,
+  }
   return core.loadWeave(WOW_FILES)
 end
 
