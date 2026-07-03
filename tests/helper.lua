@@ -56,10 +56,17 @@ local FILES = {
 }
 
 --- Loads a FRESH Weave instance (each spec starts from zero, no shared state).
-function M.loadWeave()
+--- `extraFiles`: optional list loaded AFTER the core, in order (the wow/ specs
+--- append their layer here; core/ specs never pass it).
+function M.loadWeave(extraFiles)
   local LibStub = newLibStub()
   _G.LibStub = LibStub -- library files resolve it as a global, same as in WoW
-  for _, file in ipairs(FILES) do
+  local files = {}
+  for i, file in ipairs(FILES) do files[i] = file end
+  if extraFiles then
+    for _, file in ipairs(extraFiles) do files[#files + 1] = file end
+  end
+  for _, file in ipairs(files) do
     local chunk = assert(loadfile(file), "no se pudo cargar " .. file)
     chunk("WeaveTest", {}) -- vararg (addonName, addonTable), as WoW passes it
   end

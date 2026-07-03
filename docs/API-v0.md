@@ -69,11 +69,17 @@ bind o elemento `ui` creado dentro de `scope:run(fn)` queda adscrito al scope;
 
 ## 2. Capa WoW (`Weave/wow/` — eventos y bindings)
 
-### `Weave.fromEvent(event, map?) → Signal` · `Weave.fromUnitEvent(event, unit, map?) → Signal`
+### `Weave.fromEvent(event, map?, opts?) → Signal` · `Weave.fromUnitEvent(event, unit, map?, opts?) → Signal`
 
-Señal alimentada por un evento del juego. Un solo frame interno multiplexa todos los
-registros (`RegisterUnitEvent` cuando hay unit). `map(...)` transforma los args del evento
-en el valor de la señal (default: primer arg).
+Señal alimentada por un evento del juego. Un frame interno compartido multiplexa los
+eventos globales; los eventos de unidad usan un frame por par (evento, unit), porque
+`RegisterUnitEvent` admite máximo 2 units por frame. `map(...)` transforma los args del
+evento en el valor de la señal (default: primer arg).
+
+- `opts` = las opts de signal (`fallback`, `equals` — taint-aware, §3) + `initial`:
+  valor de arranque de `fromEvent` antes del primer evento (default `nil`).
+- `fromUnitEvent` se **siembra** al crearse (llama `map(unit)` una vez) para que el
+  valor exista antes del primer evento — por eso no necesita `initial`.
 
 ```lua
 local hp = Weave.fromUnitEvent("UNIT_HEALTH", "player",
