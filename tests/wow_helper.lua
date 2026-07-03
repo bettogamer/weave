@@ -100,6 +100,7 @@ local WOW_FILES = {
   "Weave/wow/Events.lua",
   "Weave/wow/Props.lua",
   "Weave/wow/Ticker.lua",
+  "Weave/store/Store.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.

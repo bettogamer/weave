@@ -206,10 +206,15 @@ Weave.bind(frame, "scale", db.scale)
   llamarse antes (devuelve defaults y re-sincroniza al hidratar). Recomendación estándar:
   crearlo en el `ADDON_LOADED` de `Core.lua`.
 - **Defaults sin pisar** lo guardado; claves guardadas que ya no están en defaults se
-  preservan (datos del usuario nunca se borran — regla del estándar).
-- `db._raw` — acceso de escape a la tabla SavedVariables cruda (para export/debug).
-- Solo tipos serializables por WoW (boolean/number/string/table). Señales con valores no
-  serializables NO van en un store.
+  preservan (datos del usuario nunca se borran — regla del estándar). **Los defaults NO
+  se materializan en la SV**: solo persiste lo que se escribe explícitamente (estilo
+  AceDB) — cambiar un default en una versión nueva alcanza a quien nunca lo tocó.
+- `db._raw` — acceso de escape a la tabla SavedVariables cruda (para export/debug); es
+  LA MISMA tabla que la global, sin copias. Claves de defaults: strings que no empiecen
+  por `_` (reservado).
+- Solo tipos serializables por WoW (boolean/number/string/table); `set()` con otro tipo
+  → error claro. **Un secret jamás se persiste**: `set(secret)` en un campo de store
+  avisa suave y salta la escritura (señal y SV intactas).
 
 ## 6. Capa Craft (`Weave/craft/` — OPCIONAL, ADR-0004)
 

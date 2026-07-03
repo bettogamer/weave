@@ -5,4 +5,5 @@
 	<Script file="wow\Events.lua"/>
 	<Script file="wow\Props.lua"/>
 	<Script file="wow\Ticker.lua"/>
+	<Script file="store\Store.lua"/>
 </Ui>
