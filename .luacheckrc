@@ -12,7 +12,7 @@ globals = {
     "LibStub",
     -- APIs del juego usadas por la demo (demo/):
     "UnitHealth", "UnitHealthMax",
-    "SLASH_WEAVETAINT1", "SlashCmdList",
+    "SLASH_WEAVETAINT1", "SLASH_WEAVEWIDTH1", "SlashCmdList",
 }
 
 ignore = {

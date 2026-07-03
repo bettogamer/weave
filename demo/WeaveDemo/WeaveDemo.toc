@@ -4,6 +4,7 @@
 ## Author: Alberto Gomez
 ## Version: 0.1.0-dev
 ## Dependencies: Weave
+## SavedVariables: WeaveDemoDB
 
 Demo.lua
 TaintTest.lua
