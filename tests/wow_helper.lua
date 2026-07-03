@@ -39,6 +39,21 @@ local function newFrame(frameType, name, parent, template)
   function f:GetParent() return self._parent end
   function f:SetSize(w, h) self._size = { w, h } end
   function f:SetPoint(...) self._points[#self._points + 1] = { ... } end
+  -- Regions: created THROUGH their parent, like the real client (f._regions
+  -- records them in creation order; they reuse the same mock surface).
+  f._regions = {}
+  local function newRegion(regionType, name, layer, template)
+    local r = newFrame(regionType, name, f, template)
+    r._layer = layer
+    f._regions[#f._regions + 1] = r
+    return r
+  end
+  function f:CreateFontString(name, layer, template)
+    return newRegion("FontString", name, layer, template)
+  end
+  function f:CreateTexture(name, layer, template)
+    return newRegion("Texture", name, layer, template)
+  end
   -- Prop setters: they only RECORD what was applied (specs read f._set.<prop>);
   -- the mock asserts nothing about rendering, just that the right call happened.
   f._set = {}
