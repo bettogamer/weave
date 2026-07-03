@@ -1,0 +1,103 @@
+-- new_spec.lua — contract for Weave.new, basics (API-v0 §4). M4 block 1.
+-- Declarative creation: ONE description creates the frame, applies literals once
+-- and binds reactive values — over the SAME props registry bind uses.
+-- Children and [Weave.on] scripts are M4 block 2.
+
+local helper = dofile("tests/wow_helper.lua")
+
+describe("Weave.new: creación declarativa básica (API-v0 §4)", function()
+
+  it("crea el frame del tipo pedido, con UIParent por defecto", function()
+    local W = helper.loadWeaveWow()
+    local f = W.new("StatusBar", {})
+    assert_eq(f._type, "StatusBar")
+    assert_true(rawequal(f._parent, _G.UIParent))
+  end)
+
+  it("parent, name y template viajan al CreateFrame", function()
+    local W = helper.loadWeaveWow()
+    local holder = helper.newMockFrame()
+    local f = W.new("Frame", { parent = holder, name = "MiFrame", template = "BackdropTemplate" })
+    assert_true(rawequal(f._parent, holder))
+    assert_eq(f._name, "MiFrame")
+    assert_eq(f._template, "BackdropTemplate")
+  end)
+
+  it("size y point se aplican en la creación", function()
+    local W = helper.loadWeaveWow()
+    local f = W.new("StatusBar", { size = { 200, 20 }, point = { "CENTER", 0, -180 } })
+    assert_eq(f._size[1], 200)
+    assert_eq(f._size[2], 20)
+    assert_eq(f._points[1][1], "CENTER")
+    assert_eq(f._points[1][3], -180)
+  end)
+
+  it("points (plural) aplica varios anclajes en orden", function()
+    local W = helper.loadWeaveWow()
+    local f = W.new("Frame", { points = { { "TOPLEFT" }, { "BOTTOMRIGHT", -4, 4 } } })
+    assert_eq(#f._points, 2)
+    assert_eq(f._points[1][1], "TOPLEFT")
+    assert_eq(f._points[2][1], "BOTTOMRIGHT")
+    assert_eq(f._points[2][3], 4)
+  end)
+
+  it("una prop literal del registro se aplica UNA vez", function()
+    local W = helper.loadWeaveWow()
+    local f = W.new("StatusBar", { minMax = { 0, 1 }, alpha = 0.8 })
+    assert_eq(f._set.minMax[2], 1)
+    assert_eq(f._set.alpha, 0.8)
+  end)
+
+  it("una prop con señal queda BINDEADA: reacciona a los cambios", function()
+    local W = helper.loadWeaveWow()
+    local v = W.signal(0.5)
+    local f = W.new("StatusBar", { value = v })
+    assert_eq(f._set.value, 0.5, "el valor actual se aplica al crear")
+    v:set(0.9)
+    assert_eq(f._set.value, 0.9, "y los cambios siguen llegando (bind automático)")
+  end)
+
+  it("una prop con computed igual (misma vía)", function()
+    local W = helper.loadWeaveWow()
+    local hp = W.signal(50)
+    local pct = W.computed(function() return hp() / 100 end)
+    local f = W.new("StatusBar", { value = pct })
+    assert_eq(f._set.value, 0.5)
+    hp:set(80)
+    assert_eq(f._set.value, 0.8)
+  end)
+
+  it("una prop desconocida da error claro con su nombre", function()
+    local W = helper.loadWeaveWow()
+    assert_error(function() W.new("Frame", { wombo = 1 }) end, "wombo")
+  end)
+
+  it("EN COMBATE: error claro — la creación declarativa es solo fuera de combate", function()
+    local W = helper.loadWeaveWow()
+    helper.setInCombat(true)
+    assert_error(function() W.new("Frame", {}) end, "combat")
+  end)
+
+  it("dentro de scope:run(): dispose() desconecta los binds Y oculta el frame", function()
+    local W = helper.loadWeaveWow()
+    local v = W.signal(0.5)
+    local scope = W.scope()
+    local f
+    scope:run(function()
+      f = W.new("StatusBar", { value = v })
+    end)
+    v:set(0.6)
+    assert_eq(f._set.value, 0.6)
+    scope:dispose()
+    v:set(0.9)
+    assert_eq(f._set.value, 0.6, "los binds del scope dispuesto no deben seguir aplicando")
+    assert_false(f:IsShown(), "el frame se oculta y queda reutilizable")
+  end)
+
+  it("valida frameType (string) y props (tabla)", function()
+    local W = helper.loadWeaveWow()
+    assert_error(function() W.new(42, {}) end, "string")
+    assert_error(function() W.new("Frame", "nope") end, "table")
+  end)
+
+end)

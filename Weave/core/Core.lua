@@ -58,6 +58,15 @@ function Weave._isSecret(v)
   return secretDetector(v) and true or false
 end
 
+-- Shared with outer layers (ui): attaches a disposable handle to the scope whose
+-- run() is active, so non-effect resources die with the scope too. No-op outside.
+function Weave._attachToScope(handle)
+  if currentScope then
+    local items = currentScope._items
+    items[#items + 1] = handle
+  end
+end
+
 -- Visible soft warning for degraded effects, injected by the wow/ layer (print).
 -- Headless / not injected: degradation is silent.
 local secretWarning = nil
