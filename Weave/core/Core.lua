@@ -49,6 +49,10 @@ local function isSecretError(msg)
       or msg:find("ForceTaint_Strong", 1, true) ~= nil
 end
 
+-- Shared with the wow/ layer (event-map guard): ONE source of truth for what
+-- counts as a secret-shaped error.
+Weave._isSecretError = isSecretError
+
 -- Visible soft warning for degraded effects, injected by the wow/ layer (print).
 -- Headless / not injected: degradation is silent.
 local secretWarning = nil
