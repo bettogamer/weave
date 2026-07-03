@@ -187,15 +187,19 @@ function Weave.store(svName, defaults, opts)
   local raw = _G[svName]
   if raw ~= nil then
     state.raw = raw -- SV already loaded: adopt it as-is (unknown keys preserved)
-  elseif owner and C_AddOns and C_AddOns.IsAddOnLoaded(owner) then
-    state.raw = {} -- owner finished loading and nothing was ever saved: claim now
-    _G[svName] = state.raw
+    applyVersion(state, false) -- migrate BEFORE fields read their initial values
   else
     state.raw = {} -- staging: the real table arrives with the owner's ADDON_LOADED
-    needsWatch = true
-  end
-  if not needsWatch then
-    applyVersion(state, raw == nil) -- migrate BEFORE fields read their initial values
+    needsWatch = true -- ALWAYS watch while the global is nil, even if the owner
+                      -- reports loaded: IsAddOnLoaded is true DURING the owner's
+                      -- own file execution, before its SV loads (in-game 12.0.7).
+    if owner and C_AddOns and C_AddOns.IsAddOnLoaded(owner) then
+      -- Truly-late store (no event will come): claim now so writes persist.
+      -- If ADDON_LOADED does fire after all (the file-scope case), hydrate()
+      -- re-adopts whatever the client put in the global — self-healing.
+      _G[svName] = state.raw
+      applyVersion(state, true)
+    end
   end
 
   local db = { _raw = state.raw }

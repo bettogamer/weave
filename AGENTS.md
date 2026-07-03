@@ -103,6 +103,14 @@
   señal **sin** fallback bindeada directo al sink que acepta secrets
   (`SetValue`/`SetMinMaxValues`), y el texto/color derivado comprueba `isSecret()` y degrada
   ("??" / color neutro). _Demo M1 (2026-07-03)._
+- **El ancho persistido "vuelve al default" tras /reload** → `C_AddOns.IsAddOnLoaded(owner)`
+  devuelve `true` DURANTE la ejecución de los archivos del propio addon (antes de que su
+  SavedVariable cargue), así que la vía rápida "dueño ya cargado → reclama la global ya"
+  reclamaba una tabla vacía que WoW pisaba después al cargar la SV; el store quedaba ciego
+  en su tabla huérfana → patrón correcto: con la global `nil`, reclamar si hace falta pero
+  SIEMPRE seguir vigilando el `ADDON_LOADED` del dueño y re-adoptar lo que haya en la
+  global al llegar (auto-curativo bajo cualquier semántica de IsAddOnLoaded). _Store M3,
+  visto in-game (2026-07-03)._
 - **Tests de tiempo: nunca comparar contra literales decimales** → `1000 + 0.06 + 0.06 ≠
   1000.12` en coma flotante (el runner muestra "esperado 1000.12, obtenido 1000.12") →
   comparar contra la MISMA aritmética que hace el código (`t0 + dt1 + dt2`). _ticker_spec

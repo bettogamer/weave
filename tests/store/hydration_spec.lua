@@ -104,3 +104,31 @@ describe("hidratación: variantes de timing", function()
   end)
 
 end)
+
+describe("regresión: IsAddOnLoaded miente durante la carga del propio addon (visto in-game 12.0.7)", function()
+
+  it("si tras 'reclamar' llega el ADDON_LOADED del dueño con la SV ya cargada, re-adopta lo guardado", function()
+    local W = helper.loadWeaveWow()
+    helper.setAddOnLoaded("MiAddon") -- the client claims "loaded" during the owner's own file scope
+    _G.WvHydDB = nil
+    local db = W.store("WvHydDB", { width = 220 }, { addon = "MiAddon" })
+    assert_eq(db.width(), 220)
+    _G.WvHydDB = { width = 400 } -- the client NOW loads the SV file, replacing the claimed global
+    helper.fireEvent("ADDON_LOADED", "MiAddon")
+    assert_eq(db.width(), 400, "debe re-adoptar la tabla guardada, no quedarse ciego en la staging")
+    db.width:set(410)
+    assert_eq(_G.WvHydDB.width, 410, "y las escrituras posteriores deben ir a la tabla definitiva")
+  end)
+
+  it("variante primera ejecución: el ADDON_LOADED tardío no pierde las escrituras tempranas", function()
+    local W = helper.loadWeaveWow()
+    helper.setAddOnLoaded("MiAddon")
+    _G.WvHydDB = nil
+    local db = W.store("WvHydDB", { width = 220 }, { addon = "MiAddon" })
+    db.width:set(300) -- no SV file exists: the claimed table remains the SV global
+    helper.fireEvent("ADDON_LOADED", "MiAddon")
+    assert_eq(db.width(), 300, "re-hidratar sobre la propia tabla reclamada no pierde nada")
+    assert_eq(_G.WvHydDB.width, 300)
+  end)
+
+end)
