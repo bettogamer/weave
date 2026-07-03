@@ -121,6 +121,12 @@ computed fuente expone su `fallback` si lo tiene). Cualquier otro error se propa
 Shim al cargar la lib: `issecretvalue`/`issecrettable` → `function() return false end` si no
 existen (clientes pre-12.0).
 
+Enganche interno core↔wow: **`Weave._setSecretDetector(fn)`** — el core (Lua puro) no puede
+llamar `issecretvalue`; la capa `wow/` se lo inyecta al cargar. Sin inyección, nada es
+secret (default seguro). La degradación de computeds reconoce los errores del cliente por
+su texto (`"a secret"` / `"ForceTaint_Strong"`), patrón chokepoint de ADR-0003; cualquier
+otro error se propaga intacto.
+
 ## 4. UI declarativa (`Weave/ui/` — W1, ADR-0005)
 
 ### `Weave.new(frameType, props) → frame`

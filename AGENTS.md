@@ -3,8 +3,10 @@
 > README ejecutable para agentes de IA. Fuente de verdad única: si cambia una decisión,
 > este archivo y el ADR correspondiente se actualizan en el mismo commit.
 >
-> **Estado del proyecto: DISEÑO (v0).** API especificada en `docs/API-v0.md`; código aún no
-> escrito. Siguiente entregable: **M0 — `core/` + suite busted**.
+> **Estado del proyecto: IMPLEMENTACIÓN.** **M0 COMPLETO**: `core/` entero (signal, computed,
+> effect, batch, scope + semántica taint con detector inyectable) — 49 tests headless en
+> verde, 0 warnings. Siguiente entregable: **M1 — capa `wow/`** (fromEvent, bind, props,
+> onUpdate, chokepoint) + demo mínima in-game.
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -69,7 +71,8 @@
 
 ## 6. Convenciones de código
 
-- Código e identificadores en inglés; docs en español. Estándar AddonTemplate aplica
+- Código, identificadores y **comentarios in-code en INGLÉS**; docs (`docs/`, ADRs) y
+  descripciones de tests (`it("...")`) en español. Estándar AddonTemplate aplica
   (trampas Lua 5.1 de docs/02 incluidas).
 - Anotaciones LuaLS en todo símbolo público.
 
@@ -99,3 +102,4 @@ _(vacío — se llena con los bugs dolorosos reales, formato: síntoma → causa
 |---------|-------|--------|
 | v0.1 | 2026-07-02 | Fase de diseño: NORTH-STAR + ADR 0001–0004 + API-v0. Sin código aún. |
 | v0.2 | 2026-07-02 | ADR-0005 (decisión del owner): alcance v0 amplía a `ui/` + `store/`; `each` a v1; DevTools y tiempo a v2. API-v0 y NORTH-STAR actualizados. |
+| v0.3 | 2026-07-03 | **M0 completo**: core entero con 49 tests (mini-runner propio, busted queda para CI). Git creado (identidad Betto, sin trailers de IA), licencia MIT, mensajes de error de la API en inglés, enganche `_setSecretDetector` documentado en API-v0 §3. |

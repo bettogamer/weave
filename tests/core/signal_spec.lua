@@ -1,5 +1,5 @@
--- signal_spec.lua — contrato de Weave.signal + Weave.effect + Weave.batch (API-v0 §1).
--- Bloque 1 de M0. Se lee como ejemplos de uso: cada `it` es una promesa de la API.
+-- signal_spec.lua — contract for Weave.signal + Weave.effect + Weave.batch (API-v0 §1).
+-- M0 block 1. Reads as usage examples: every `it` is an API promise.
 
 local helper = dofile("tests/helper.lua")
 
@@ -59,7 +59,7 @@ describe("Weave.effect (reacciona a las señales que lee)", function()
     local hp = W.signal(100)
     local runs = 0
     W.effect(function() hp(); runs = runs + 1 end)
-    hp:set(100) -- mismo valor
+    hp:set(100) -- same value
     assert_eq(runs, 1, "no debió re-ejecutarse")
   end)
 
@@ -92,11 +92,11 @@ describe("Weave.effect (reacciona a las señales que lee)", function()
       if useA() then a() else b() end
     end)
     assert_eq(runs, 1)
-    b:set("B2")            -- b NO es dependencia todavía
+    b:set("B2")            -- b is NOT a dependency yet
     assert_eq(runs, 1, "b no debía disparar mientras no se lee")
-    useA:set(false)        -- ahora el effect lee b
+    useA:set(false)        -- now the effect reads b
     assert_eq(runs, 2)
-    a:set("A2")            -- a YA no es dependencia
+    a:set("A2")            -- a is NO LONGER a dependency
     assert_eq(runs, 2, "a no debía disparar cuando dejó de leerse")
     b:set("B3")
     assert_eq(runs, 3)
@@ -108,7 +108,7 @@ describe("Weave.effect (reacciona a las señales que lee)", function()
     local runs = 0
     local h = W.effect(function() hp(); runs = runs + 1 end)
     h:dispose()
-    h:dispose() -- segunda vez: no explota
+    h:dispose() -- second call: must not blow up
     hp:set(1)
     assert_eq(runs, 1, "un effect dispuesto no reacciona")
   end)
@@ -117,9 +117,9 @@ describe("Weave.effect (reacciona a las señales que lee)", function()
     local W = helper.loadWeave()
     local hp = W.signal(1)
     local total = 0
-    W.effect(function() total = total + hp() end)   -- corre con 1
-    W.effect(function() total = total + hp() * 10 end) -- corre con 10
-    hp:set(2) -- +2 y +20
+    W.effect(function() total = total + hp() end)      -- runs with 1
+    W.effect(function() total = total + hp() * 10 end) -- runs with 10
+    hp:set(2) -- +2 and +20
     assert_eq(total, 33)
   end)
 
@@ -129,15 +129,15 @@ describe("opts.equals (comparador propio)", function()
 
   it("permite decidir qué cuenta como 'cambió'", function()
     local W = helper.loadWeave()
-    -- redondeando: 1.24 → 1.2, 1.26 → 1.3; solo notifica si cambia el redondeo
+    -- rounding to one decimal: 1.24 → 1.2, 1.26 → 1.3; notify only when the rounding changes
     local x = W.signal(1.24, { equals = function(a, b)
       return math.floor(a * 10 + 0.5) == math.floor(b * 10 + 0.5)
     end })
     local runs = 0
     W.effect(function() x(); runs = runs + 1 end)
-    x:set(1.249) -- mismo redondeo → no notifica
+    x:set(1.249) -- same rounding → no notify
     assert_eq(runs, 1)
-    x:set(1.26)  -- cambia el redondeo → notifica
+    x:set(1.26)  -- rounding changed → notify
     assert_eq(runs, 2)
   end)
 
@@ -174,7 +174,7 @@ describe("Weave.batch (agrupar escrituras)", function()
     assert_error(function()
       W.batch(function() hp:set(1) error("boom") end)
     end, "boom")
-    hp:set(2) -- el sistema sigue vivo
+    hp:set(2) -- the system must still be alive
     assert_eq(runs >= 2, true, "los effects deben seguir funcionando tras el error")
   end)
 
@@ -190,7 +190,7 @@ describe("validación de argumentos (errores claros para el dev)", function()
   it("set exige llamarse con dos puntos (hp:set, no hp.set)", function()
     local W = helper.loadWeave()
     local hp = W.signal(100)
-    assert_error(function() hp.set(5) end) -- olvidó el ':' — error, no corrupción silenciosa
+    assert_error(function() hp.set(5) end) -- forgot the ':' — clear error, not silent corruption
   end)
 
 end)

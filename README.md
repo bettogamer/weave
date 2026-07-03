@@ -45,6 +45,11 @@ Piezas independientes y adoptables por separado (no un framework monolítico —
 - [docs/adr/](docs/adr/) — decisiones fundacionales (0001–0004)
 - [docs/API-v0.md](docs/API-v0.md) — spec de la API v0 (lo que se implementará)
 
+## Licencia
+
+**MIT** (como Craft y Fusion) — libre de embeberse en cualquier addon, incluidos los GPL.
+Sin código heredado de WeakAuras ni de terceros: reimplementación desde cero.
+
 ## Nombre
 
 "Weave" (tejer): pareja temática con Craft, hilos de estado que se tejen en la UI, corto para

@@ -1,6 +1,6 @@
--- tests/helper.lua — carga Weave como lo haría WoW (vararg por archivo) con un LibStub mínimo.
--- El core es Lua puro (ADR-0004): este helper NO mockea ninguna API de WoW — si algún día
--- un test de core/ lo necesita, el diseño está mal (ver CLAUDE.md).
+-- tests/helper.lua — loads Weave the way WoW would (per-file vararg) with a minimal LibStub.
+-- The core is pure Lua (ADR-0004): this helper mocks NO WoW API — if a core/ test ever
+-- needs one, the design is wrong (see CLAUDE.md).
 
 local M = {}
 
@@ -22,19 +22,46 @@ local function newLibStub()
   return LibStub
 end
 
--- Archivos de la lib en orden de carga (el mismo orden que tendrá el .toc / embeds.xml)
+------------------------------------------------------------------------------
+-- Fake secret values (WoW 12.0+ simulation, headless)
+-- Real secrets throw on any operation; these mimic that, with the same error
+-- wording the real client uses ("a secret ... value") so degradation paths match.
+------------------------------------------------------------------------------
+local function blow()
+  error("attempt to perform arithmetic on a secret number value (simulated)", 2)
+end
+
+local SECRET_MT = {
+  __metatable = "WeaveFakeSecret", -- tag readable via getmetatable(); real mt is protected
+  __add = blow, __sub = blow, __mul = blow, __div = blow, __mod = blow,
+  __pow = blow, __unm = blow, __concat = blow, __len = blow,
+  __eq = blow, __lt = blow, __le = blow,
+}
+
+--- Creates a value that behaves like a WoW secret (any operation on it throws).
+function M.newFakeSecret()
+  return setmetatable({}, SECRET_MT)
+end
+
+--- Detector to inject via Weave._setSecretDetector (the wow/ layer will inject the
+--- real issecretvalue in M1).
+function M.isFakeSecret(v)
+  return getmetatable(v) == "WeaveFakeSecret"
+end
+
+-- Library files in load order (same order the .toc / embeds.xml will use)
 local FILES = {
   "Weave/Weave.lua",
   "Weave/core/Core.lua",
 }
 
---- Carga una instancia FRESCA de Weave (cada spec parte de cero, sin estado compartido).
+--- Loads a FRESH Weave instance (each spec starts from zero, no shared state).
 function M.loadWeave()
   local LibStub = newLibStub()
-  _G.LibStub = LibStub -- los archivos de la lib lo resuelven como global, igual que en WoW
+  _G.LibStub = LibStub -- library files resolve it as a global, same as in WoW
   for _, file in ipairs(FILES) do
     local chunk = assert(loadfile(file), "no se pudo cargar " .. file)
-    chunk("WeaveTest", {}) -- vararg (addonName, addonTable), como WoW
+    chunk("WeaveTest", {}) -- vararg (addonName, addonTable), as WoW passes it
   end
   return LibStub("Weave-1.0")
 end
