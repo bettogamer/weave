@@ -1,28 +1,26 @@
--- WeaveDemo/Demo.lua — M1 minimal demo: reactive player health bar.
--- 12.0 reality check: UnitHealth/UnitHealthMax return SECRET values in addon code
--- ALWAYS (even out of combat — confirmed in-game on 12.0.7). So this demo shows
--- the two sanctioned patterns side by side:
---   * bar fill: signals WITHOUT fallback — the secret flows untouched into sinks
---     that accept it (SetValue / SetMinMaxValues), so the bar shows REAL health.
---   * text/color: arithmetic on a secret is impossible — read the raw signal (for
---     tracking), check isSecret(), and degrade to "??" / a neutral color.
+-- WeaveDemo/Demo.lua — the CANONICAL demo (API-v0 §7) in its final form:
+-- state (persistent store + game events as signals) → derivations (computeds) →
+-- ONE declarative view description. Zero manual handlers, taint-proof.
+--
+-- 12.0 reality (verified in-game): UnitHealth/UnitHealthMax return SECRETS in
+-- addon code, always. Holding/passing one is fine (sinks accept them); operating
+-- one is not — derivations check isSecret() and degrade ("??" / neutral color).
 
 local ADDON = ... -- WoW passes (addonName, addonTable) to every file
 
 local W = LibStub("Weave-1.0")
 
--- PERSISTENT STATE (M3): created at file scope, BEFORE the SV loads — it starts
--- on defaults and re-syncs (bar width included) when ADDON_LOADED hydrates it.
--- The .toc declares: ## SavedVariables: WeaveDemoDB
-local db = W.store("WeaveDemoDB", { width = 220 }, { addon = ADDON, version = 1 })
+-- The registry is extensible: statusBarTexture is not a v0 built-in prop.
+W.props.register("statusBarTexture", function(f, v) f:SetStatusBarTexture(v) end)
 
--- STATE: no fallback declared — the secret circulates as-is (API-v0 §3, row 3)
-local hp = W.fromUnitEvent("UNIT_HEALTH", "player",
+-- STATE
+local db    = W.store("WeaveDemoDB", { width = 220 }, { addon = ADDON, version = 1 })
+local hp    = W.fromUnitEvent("UNIT_HEALTH", "player",
   function(u) return UnitHealth(u) end)
 local hpMax = W.fromUnitEvent("UNIT_MAXHEALTH", "player",
   function(u) return UnitHealthMax(u) end)
 
--- DERIVATIONS: reading/holding a secret is fine; OPERATING on it is not
+-- DERIVATIONS
 local range = W.computed(function() return { 0, hpMax() } end)
 
 local text = W.computed(function()
@@ -37,22 +35,26 @@ local color = W.computed(function()
   return (v / math.max(m, 1)) < 0.3 and { 1, 0.2, 0.2 } or { 0.2, 0.8, 0.2 }
 end, { fallback = { 0.2, 0.8, 0.2 } })
 
--- VIEW: created once, out of combat (declarative creation via W.new arrives in M4)
-local bar = CreateFrame("StatusBar", "WeaveDemoBar", UIParent)
-bar:SetHeight(22)
-bar:SetPoint("CENTER", 0, -180)
-bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+-- VIEW: one description, created once, out of combat
+W.new("StatusBar", {
+  name   = "WeaveDemoBar",
+  point  = { "CENTER", 0, -180 },
+  width  = db.width, -- persistent AND reactive: /weavewidth resizes live
+  height = 22,
+  minMax = range,
+  value  = hp, -- the secret goes straight into the sink: real fill
+  statusBarColor   = color,
+  statusBarTexture = "Interface\\TargetingFrame\\UI-StatusBar",
+  [W.children] = {
+    W.new("FontString", {
+      layer = "OVERLAY", point = { "CENTER" },
+      template = "GameFontHighlightSmall",
+      text = text,
+    }),
+  },
+})
 
-local label = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-label:SetPoint("CENTER")
-
-W.bind(bar, "width", db.width) -- persistent: survives /reload and logout
-W.bind(bar, "minMax", range)
-W.bind(bar, "value", hp) -- the secret goes straight into the sink: real fill
-W.bind(bar, "statusBarColor", color)
-W.bind(label, "text", text)
-
--- /weavewidth <n>: the in-game knob to verify persistence (M3 success criterion)
+-- /weavewidth <n>: the persistence knob (M3 success criterion)
 SLASH_WEAVEWIDTH1 = "/weavewidth"
 SlashCmdList.WEAVEWIDTH = function(msg)
   local n = tonumber(msg)
