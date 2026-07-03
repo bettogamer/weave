@@ -12,11 +12,14 @@ if issecretvalue then
   Weave._setSecretDetector(issecretvalue)
 end
 
--- Visible side of the effect chokepoint (ADR-0003): one soft chat line per degraded
--- site, never the red error popup. The once-per-site accounting lives in the core.
-Weave._setSecretWarning(function(err)
-  print("|cffffd100Weave:|r an effect degraded on a secret value (12.0 taint): " .. tostring(err))
-end)
+-- Visible side of the chokepoints (ADR-0003): one soft chat line per degraded
+-- site, never the red error popup.
+local function softWarn(what, err)
+  print("|cffffd100Weave:|r " .. what .. " degraded on a secret value (12.0 taint): " .. tostring(err))
+end
+
+-- Effects/binds: the once-per-site accounting lives in the core.
+Weave._setSecretWarning(function(err) softWarn("an effect", err) end)
 
 -- Default map: the signal takes the event's first argument.
 local function firstArg(first) return first end
@@ -28,14 +31,32 @@ local function firstArg(first) return first end
 -- most two units per frame, so a single frame cannot host N different filters.
 ------------------------------------------------------------------------------
 
+-- Runs ONE subscriber's map under the secret-error guard (ADR-0003): a map that
+-- OPERATES on a secret degrades that update only — the registration stays alive,
+-- other subscribers still run, and the warning fires once per registration.
+-- Non-secret errors are real dev bugs and propagate intact.
+local function applySub(sub, ...)
+  local ok, result = pcall(sub.map, ...)
+  if not ok then
+    if Weave._isSecretError(result) then
+      if not sub.warned then
+        sub.warned = true
+        softWarn("an event map", result)
+      end
+      return
+    end
+    error(result, 0)
+  end
+  sub.signal:set(result)
+end
+
 -- Fans one event out to its subscribers. NOTE (v0): each signal:set() flushes on
 -- its own; several signals fed by the SAME event update sequentially, not as one
 -- batch (batching the fan-out without allocating per event needs a vararg pack —
 -- revisit if it ever bites).
 local function dispatch(subs, ...)
   for i = 1, #subs do
-    local sub = subs[i]
-    sub.signal:set(sub.map(...))
+    applySub(subs[i], ...)
   end
 end
 
@@ -96,9 +117,11 @@ function Weave.fromUnitEvent(event, unit, map, opts)
     entry.frame:RegisterUnitEvent(event, unit)
     unitEntries[key] = entry
   end
-  entry.subs[#entry.subs + 1] = { signal = signal, map = map }
+  local sub = { signal = signal, map = map }
+  entry.subs[#entry.subs + 1] = sub
   -- Seed: expose the CURRENT value right away instead of waiting for the first
-  -- event (signal opts apply: a secret seed with a declared fallback degrades).
-  signal:set(map(unit))
+  -- event. Same guard as dispatch: a map that operates on a secret at load must
+  -- not blow up addon loading — the signal just starts empty.
+  applySub(sub, unit)
   return signal
 end

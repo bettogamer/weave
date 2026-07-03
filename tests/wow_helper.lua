@@ -56,6 +56,16 @@ function M.frameCount()
   return #frames
 end
 
+--- Runs fn with print muted: for specs that TRIGGER degradation warnings but do
+--- not assert them (keeps the runner output clean). Errors propagate intact.
+function M.silently(fn)
+  local realPrint = print
+  _G.print = function() end
+  local ok, err = pcall(fn)
+  _G.print = realPrint
+  if not ok then error(err, 0) end
+end
+
 local now -- fake clock, reset by loadWeaveWow()
 
 --- Advances the fake clock and fires every OnUpdate script once, with `dt` as the

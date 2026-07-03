@@ -80,6 +80,10 @@ evento en el valor de la señal (default: primer arg).
   valor de arranque de `fromEvent` antes del primer evento (default `nil`).
 - `fromUnitEvent` se **siembra** al crearse (llama `map(unit)` una vez) para que el
   valor exista antes del primer evento — por eso no necesita `initial`.
+- El `map` corre bajo el **guard de secrets** (ADR-0003): si OPERA un secret
+  (aritmética, comparación…), esa actualización se salta — el registro sigue vivo, los
+  demás suscriptores del evento no se ven afectados, y avisa una vez por registro. La
+  siembra degrada igual (la señal arranca `nil`). Errores no-secret se propagan intactos.
 
 ```lua
 local hp = Weave.fromUnitEvent("UNIT_HEALTH", "player",
@@ -137,7 +141,9 @@ existen (clientes pre-12.0).
 
 Enganche interno core↔wow: **`Weave._setSecretDetector(fn)`** — el core (Lua puro) no puede
 llamar `issecretvalue`; la capa `wow/` se lo inyecta al cargar. Sin inyección, nada es
-secret (default seguro). La degradación de computeds reconoce los errores del cliente por
+secret (default seguro). El core también expone **`Weave._isSecretError(msg)`** (el
+reconocedor de mensajes de error) para que la capa wow aplique el MISMO criterio en sus
+guards (maps de eventos). La degradación de computeds reconoce los errores del cliente por
 su texto (`"a secret"` / `"ForceTaint_Strong"`), patrón chokepoint de ADR-0003; cualquier
 otro error se propaga intacto.
 

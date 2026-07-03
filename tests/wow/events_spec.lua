@@ -111,6 +111,68 @@ describe("fromUnitEvent (evento filtrado por unidad)", function()
 
 end)
 
+describe("guard del map: un map que OPERA un secret degrada, no revienta el OnEvent (M2)", function()
+
+  it("el error de secret del map no se propaga: se salta esa actualización", function()
+    local W = helper.loadWeaveWow()
+    local s = W.fromEvent("EV", function(v) return v + 1 end) -- +1 blows on a secret
+    helper.fireEvent("EV", 1)
+    assert_eq(s(), 2)
+    helper.silently(function() helper.fireEvent("EV", helper.newFakeSecret()) end) -- must NOT raise
+    assert_eq(s(), 2, "la actualización con secret se salta; queda el último valor bueno")
+  end)
+
+  it("cuando vuelven args normales, el map funciona otra vez", function()
+    local W = helper.loadWeaveWow()
+    local s = W.fromEvent("EV", function(v) return v + 1 end)
+    helper.silently(function() helper.fireEvent("EV", helper.newFakeSecret()) end)
+    helper.fireEvent("EV", 10)
+    assert_eq(s(), 11, "el guard degrada la actualización, no mata el registro")
+  end)
+
+  it("los demás suscriptores del mismo evento no se ven afectados", function()
+    local W = helper.loadWeaveWow()
+    local bad  = W.fromEvent("EV", function(v) return v + 1 end) -- degrades on secret
+    local good = W.fromEvent("EV", function() return "ok" end)   -- never touches args
+    helper.silently(function() helper.fireEvent("EV", helper.newFakeSecret()) end)
+    assert_eq(good(), "ok", "la degradación de un suscriptor no corta el fan-out")
+    assert_eq(bad(), nil)
+  end)
+
+  it("la siembra de fromUnitEvent también degrada: crear no lanza, la señal arranca vacía", function()
+    local W = helper.loadWeaveWow()
+    local secretHealth = helper.newFakeSecret()
+    local hp
+    helper.silently(function()
+      hp = W.fromUnitEvent("UNIT_HEALTH", "player", function() return secretHealth + 1 end)
+    end)
+    assert_eq(hp(), nil, "siembra degradada: sin valor inicial, sin error Lua")
+  end)
+
+  it("la advertencia sale UNA sola vez por registro (print suave, identifica a Weave)", function()
+    local prints = {}
+    local realPrint = print
+    _G.print = function(msg) prints[#prints + 1] = tostring(msg) end
+    local ok, err = pcall(function()
+      local W = helper.loadWeaveWow()
+      W.fromEvent("EV", function(v) return v + 1 end)
+      helper.fireEvent("EV", helper.newFakeSecret())
+      helper.fireEvent("EV", helper.newFakeSecret()) -- same registration: no second warning
+    end)
+    _G.print = realPrint
+    assert_true(ok, "nada debe propagar error Lua: " .. tostring(err))
+    assert_eq(#prints, 1, "una advertencia por registro, no una por evento")
+    assert_true(prints[1]:find("Weave", 1, true) ~= nil)
+  end)
+
+  it("un error NO-secret del map SÍ se propaga (bug real del dev)", function()
+    local W = helper.loadWeaveWow()
+    W.fromEvent("EV", function() error("bug real del dev") end)
+    assert_error(function() helper.fireEvent("EV") end, "bug real del dev")
+  end)
+
+end)
+
 describe("taint en señales de evento (API-v0 §3 aplica igual)", function()
 
   it("al cargar, la capa wow inyecta el issecretvalue del cliente al detector del core", function()
