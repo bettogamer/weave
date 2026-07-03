@@ -1,24 +1,24 @@
--- core/Core.lua — el motor reactivo: signal, effect, batch. (computed y scope: bloques siguientes.)
--- Lua 5.1 PURO: este archivo no puede llamar ninguna API de WoW (ADR-0004).
+-- core/Core.lua — the reactive engine: signal, effect, batch. (computed and scope: next blocks.)
+-- PURE Lua 5.1: this file must not call any WoW API (ADR-0004).
 --
--- Modelo: un effect en ejecución se registra como observador de cada señal que LEE
--- (auto-tracking). Al escribir una señal, sus observadores se encolan y se ejecutan
--- (re-trackeando sus dependencias desde cero, para que las deps sean siempre las de la
--- última ejecución). `batch` difiere la ejecución al final para coalescer escrituras.
+-- Model: while an effect runs, it registers itself as an observer of every signal it READS
+-- (auto-tracking). Writing a signal enqueues its observers and runs them, re-tracking their
+-- dependencies from scratch so deps always reflect the latest execution. `batch` defers the
+-- runs to the end to coalesce writes.
 --
--- Contrato de rendimiento (API-v0 §1): el camino set()→notify no crea tablas nuevas;
--- la cola y los sets de deps/observadores se reutilizan.
+-- Performance contract (API-v0 §1): the set()→notify path allocates no new tables;
+-- the queue and the dep/observer sets are reused.
 
 local Weave = LibStub("Weave-1.0", true)
-if not Weave or Weave.signal then return end -- copia repetida: la primera gana (v0)
+if not Weave or Weave.signal then return end -- duplicate copy: first one wins (v0)
 
 ------------------------------------------------------------------------------
--- Estado interno del grafo (por copia de la lib)
+-- Internal graph state (per library copy)
 ------------------------------------------------------------------------------
-local currentObserver = nil -- effect cuyo fn está corriendo (colector de dependencias)
-local batchDepth      = 0   -- >0 = dentro de Weave.batch
+local currentObserver = nil -- effect whose fn is running (dependency collector)
+local batchDepth      = 0   -- >0 = inside Weave.batch
 local flushing        = false
-local queue, queued   = {}, {} -- cola FIFO de effects pendientes + set de dedup
+local queue, queued   = {}, {} -- FIFO queue of pending effects + dedup set
 
 ------------------------------------------------------------------------------
 -- Effects
@@ -33,7 +33,7 @@ end
 
 local function runEffect(eff)
   if eff._disposed then return end
-  untrackDeps(eff) -- re-tracking: las deps se reconstruyen en cada ejecución
+  untrackDeps(eff) -- re-tracking: deps are rebuilt on every run
   local prev = currentObserver
   currentObserver = eff
   local ok, err = pcall(eff._fn)
@@ -46,7 +46,7 @@ local function flush()
   flushing = true
   local firstErr = nil
   local i = 0
-  while i < #queue do -- los effects pueden encolar más (cascadas): el while los alcanza
+  while i < #queue do -- effects may enqueue more (cascades): the while picks them up
     i = i + 1
     local eff = queue[i]
     queued[eff] = nil
@@ -90,7 +90,7 @@ end
 ------------------------------------------------------------------------------
 -- Signals
 ------------------------------------------------------------------------------
-local SignalMT -- forward (lo necesita el guard de set)
+local SignalMT -- forward declaration (needed by the set() guard)
 
 local function rawEquals(a, b) return a == b end
 
@@ -109,7 +109,7 @@ function SignalMethods:set(v)
   if getmetatable(self) ~= SignalMT then
     error("Weave: usa señal:set(v) (con dos puntos), no señal.set(v)", 2)
   end
-  -- ¿cambió de verdad? comparación protegida: si comparar lanza (secret values), se asume que cambió
+  -- did it really change? protected compare: if comparing throws (secret values), assume it changed
   local eq = self._equals or rawEquals
   local ok, same = pcall(eq, self._value, v)
   if ok and same then return end

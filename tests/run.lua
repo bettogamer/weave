@@ -1,6 +1,6 @@
--- tests/run.lua — mini-runner de tests, Lua puro (5.1–5.4), cero dependencias.
--- Uso: lua tests/run.lua tests/core/*_spec.lua
--- API estilo busted: describe / it / asserts. En CI se puede migrar a busted sin tocar los specs.
+-- tests/run.lua — minimal test runner, pure Lua (5.1–5.4), zero dependencies.
+-- Usage: lua tests/run.lua tests/core/*_spec.lua
+-- busted-style API: describe / it / asserts. Specs can migrate to busted (CI) unchanged.
 
 local passed, failures = 0, {}
 local path = {}
@@ -44,7 +44,7 @@ function assert_error(fn, pattern, msg)
   end
 end
 
--- ejecutar los specs pasados como argumentos
+-- run the spec files passed as arguments
 local specs = { ... }
 if #specs == 0 then print("uso: lua tests/run.lua <spec.lua> [...]") os.exit(2) end
 for _, spec in ipairs(specs) do

@@ -27,6 +27,11 @@ busted tests/                          # core/ DEBE pasar sin mock de WoW
 - **Releases = tags semver `v*`** sobre main.
 - **MUST NOT `git push`** — lo hace el owner a mano. Commit/branch solo si el usuario lo pide.
 
+## Convenciones (recordatorio operativo)
+
+- **Comentarios in-code SIEMPRE en inglés** (código e identificadores también). En español:
+  docs/, ADRs y las descripciones `it("...")` de los tests.
+
 ## Notas específicas de Claude Code
 
 - Antes de escribir código de `core/`: los tests se escriben contra `docs/API-v0.md`

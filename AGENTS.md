@@ -69,7 +69,8 @@
 
 ## 6. Convenciones de código
 
-- Código e identificadores en inglés; docs en español. Estándar AddonTemplate aplica
+- Código, identificadores y **comentarios in-code en INGLÉS**; docs (`docs/`, ADRs) y
+  descripciones de tests (`it("...")`) en español. Estándar AddonTemplate aplica
   (trampas Lua 5.1 de docs/02 incluidas).
 - Anotaciones LuaLS en todo símbolo público.
 

@@ -1,6 +1,6 @@
--- tests/helper.lua — carga Weave como lo haría WoW (vararg por archivo) con un LibStub mínimo.
--- El core es Lua puro (ADR-0004): este helper NO mockea ninguna API de WoW — si algún día
--- un test de core/ lo necesita, el diseño está mal (ver CLAUDE.md).
+-- tests/helper.lua — loads Weave the way WoW would (per-file vararg) with a minimal LibStub.
+-- The core is pure Lua (ADR-0004): this helper mocks NO WoW API — if a core/ test ever
+-- needs one, the design is wrong (see CLAUDE.md).
 
 local M = {}
 
@@ -22,19 +22,19 @@ local function newLibStub()
   return LibStub
 end
 
--- Archivos de la lib en orden de carga (el mismo orden que tendrá el .toc / embeds.xml)
+-- Library files in load order (same order the .toc / embeds.xml will use)
 local FILES = {
   "Weave/Weave.lua",
   "Weave/core/Core.lua",
 }
 
---- Carga una instancia FRESCA de Weave (cada spec parte de cero, sin estado compartido).
+--- Loads a FRESH Weave instance (each spec starts from zero, no shared state).
 function M.loadWeave()
   local LibStub = newLibStub()
-  _G.LibStub = LibStub -- los archivos de la lib lo resuelven como global, igual que en WoW
+  _G.LibStub = LibStub -- library files resolve it as a global, same as in WoW
   for _, file in ipairs(FILES) do
     local chunk = assert(loadfile(file), "no se pudo cargar " .. file)
-    chunk("WeaveTest", {}) -- vararg (addonName, addonTable), como WoW
+    chunk("WeaveTest", {}) -- vararg (addonName, addonTable), as WoW passes it
   end
   return LibStub("Weave-1.0")
 end
