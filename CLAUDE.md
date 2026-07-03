@@ -6,22 +6,25 @@
 
 ## Estado actual (handoff — actualizar al cerrar cada sesión)
 
-- **M1 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): capa `Weave/wow/` entera —
-  `fromEvent`/`fromUnitEvent` (multiplexado, siembra con `map(unit)`), `Weave.props` +
-  `bind` (10 built-in), `onUpdate` (ticker compartido, misma señal por intervalo),
-  chokepoint de secrets en effects (en el CORE, aviso inyectable `_setSecretWarning`) e
-  inyección del `issecretvalue` real. **91 tests en verde, 0 warnings, taintlint limpio.**
-  Weave empaquetada standalone (`Weave.toc`/`Weave.xml`, LibStub vendoreado en `libs/`) +
-  `demo/WeaveDemo` (barra de vida) + `scripts/deploy-local.ps1`. `dev` mergeado a `main`.
+- **M2 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): taint end-to-end. Guard de secrets
+  en los maps de eventos (tercer y último punto de entrada de código de usuario;
+  `Weave._isSecretError` compartido core→wow) + `/weavetaint` (`demo/WeaveDemo/
+  TaintTest.lua`): pipeline completo construido dentro de `loadstring` bajo
+  ForceTaint_Strong con secrets REALES — barra pintando vida real, texto "?? (taint)",
+  guards avisando una vez por sitio, CERO popups. **97 tests en verde, 0 warnings,
+  taintlint limpio** (los 2 INFO SV010 de la demo son intencionales: propagación
+  deliberada al sink). M1 detrás: capa `wow/` entera + Weave standalone + demo +
+  deploy-local. `dev` mergeado a `main`.
 - **Hallazgo clave 12.0.7** (verificado in-game): `UnitHealth`/`UnitHealthMax` devuelven
   secret SIEMPRE en código de addon → un fallback numérico da "0%" permanente. Patrón:
   señal SIN fallback → secret directo a los sinks (`SetValue`/`SetMinMaxValues` los
   aceptan); texto/color con `isSecret()` → "??". Ver AGENTS.md §9 y CLAUDE.md global.
-- **Siguiente: M2 — taint end-to-end** (demo bajo ForceTaint sin errores Lua). Primer
-  bloque ya identificado y pendiente de OK: guard del `map` de usuario en el dispatch de
-  eventos (`Events.lua`) — hoy un `map` que OPERA un secret explota fuera del chokepoint
-  (popup). Tests primero, como siempre. Los 2 INFO SV010 de taintlint en la demo son
-  intencionales (propagación deliberada al sink).
+- **Siguiente: M3 — `Weave/store/`** (leer API-v0 §5 antes de proponer bloques):
+  SavedVariables reactivas — hidratación en `ADDON_LOADED` del addon dueño (llamable
+  antes: defaults y re-sync al hidratar), defaults sin pisar lo guardado, claves
+  desconocidas se preservan (datos del usuario intocables), sub-stores anidados,
+  `version`/`migrate`, `_raw`. Testing headless: SV simulada como global fake +
+  disparar `ADDON_LOADED` con el mock de eventos de `tests/wow_helper.lua`.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
