@@ -10,6 +10,8 @@ globals = {
     "issecretvalue", "issecrettable",
     "print",
     "LibStub",
+    -- APIs del juego usadas por la demo (demo/):
+    "UnitHealth", "UnitHealthMax",
 }
 
 ignore = {
@@ -27,4 +29,5 @@ files = {
 exclude_files = {
     "related-addons/",
     "docs/",
+    "Weave/libs/",   -- código de terceros vendoreado (LibStub): no se lintea ni se toca
 }

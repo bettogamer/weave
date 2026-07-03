@@ -49,6 +49,17 @@ local function isSecretError(msg)
       or msg:find("ForceTaint_Strong", 1, true) ~= nil
 end
 
+-- Visible soft warning for degraded effects, injected by the wow/ layer (print).
+-- Headless / not injected: degradation is silent.
+local secretWarning = nil
+
+function Weave._setSecretWarning(fn)
+  if type(fn) ~= "function" then
+    error("Weave._setSecretWarning: expected a function, got " .. type(fn), 2)
+  end
+  secretWarning = fn
+end
+
 ------------------------------------------------------------------------------
 -- Dependency tracking (shared by effects and computeds)
 ------------------------------------------------------------------------------
@@ -183,7 +194,19 @@ local function runEffect(eff)
   currentObserver = eff
   local ok, err = pcall(eff._fn)
   currentObserver = prev
-  if not ok then error(err, 0) end
+  if not ok then
+    if isSecretError(err) then
+      -- Chokepoint (ADR-0003): degrade instead of crashing. Deps tracked before the
+      -- blow-up stay registered, so the effect revives when they turn normal again
+      -- (known limit: a fn that blows before reading any signal never re-runs).
+      if not eff._secretWarned then
+        eff._secretWarned = true
+        if secretWarning then secretWarning(err) end
+      end
+      return
+    end
+    error(err, 0)
+  end
 end
 
 -- Recomputes every queued dirty computed, propagating only real changes.

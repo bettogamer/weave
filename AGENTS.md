@@ -3,10 +3,12 @@
 > README ejecutable para agentes de IA. Fuente de verdad única: si cambia una decisión,
 > este archivo y el ADR correspondiente se actualizan en el mismo commit.
 >
-> **Estado del proyecto: IMPLEMENTACIÓN.** **M0 COMPLETO**: `core/` entero (signal, computed,
-> effect, batch, scope + semántica taint con detector inyectable) — 49 tests headless en
-> verde, 0 warnings. Siguiente entregable: **M1 — capa `wow/`** (fromEvent, bind, props,
-> onUpdate, chokepoint) + demo mínima in-game.
+> **Estado del proyecto: IMPLEMENTACIÓN.** **M1 COMPLETO**: `core/` + `wow/` enteros
+> (fromEvent/fromUnitEvent, props + bind, onUpdate, chokepoint de secrets) — 91 tests
+> headless en verde, 0 warnings luacheck, taintlint limpio, y demo in-game VERIFICADA
+> (barra de vida real vía sink-directo con secrets). Siguiente entregable: **M2 — taint
+> end-to-end** (demo bajo ForceTaint sin errores; primero: guard del `map` de usuario en
+> el dispatch de eventos).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -94,7 +96,17 @@
 
 ## 9. Lecciones / errores comunes del proyecto
 
-_(vacío — se llena con los bugs dolorosos reales, formato: síntoma → causa → patrón correcto)_
+- **La demo muestra "0%" fijo sin ningún error Lua** → en 12.0.7 `UnitHealth`/`UnitHealthMax`
+  devuelven secret values SIEMPRE en código de addon (incluso fuera de combate, sin
+  ForceTaint), así que el `fallback` numérico declarado se convierte en el valor permanente →
+  patrón correcto: el fallback es para valores que se OPERAN; lo que solo se PINTA va como
+  señal **sin** fallback bindeada directo al sink que acepta secrets
+  (`SetValue`/`SetMinMaxValues`), y el texto/color derivado comprueba `isSecret()` y degrada
+  ("??" / color neutro). _Demo M1 (2026-07-03)._
+- **Tests de tiempo: nunca comparar contra literales decimales** → `1000 + 0.06 + 0.06 ≠
+  1000.12` en coma flotante (el runner muestra "esperado 1000.12, obtenido 1000.12") →
+  comparar contra la MISMA aritmética que hace el código (`t0 + dt1 + dt2`). _ticker_spec
+  (2026-07-03)._
 
 ## 10. Registro de cambios
 
@@ -103,3 +115,4 @@ _(vacío — se llena con los bugs dolorosos reales, formato: síntoma → causa
 | v0.1 | 2026-07-02 | Fase de diseño: NORTH-STAR + ADR 0001–0004 + API-v0. Sin código aún. |
 | v0.2 | 2026-07-02 | ADR-0005 (decisión del owner): alcance v0 amplía a `ui/` + `store/`; `each` a v1; DevTools y tiempo a v2. API-v0 y NORTH-STAR actualizados. |
 | v0.3 | 2026-07-03 | **M0 completo**: core entero con 49 tests (mini-runner propio, busted queda para CI). Git creado (identidad Betto, sin trailers de IA), licencia MIT, mensajes de error de la API en inglés, enganche `_setSecretDetector` documentado en API-v0 §3. |
+| v0.4 | 2026-07-03 | **M1 completo**: capa `wow/` entera (91 tests) + Weave empaquetada standalone (toc/xml, LibStub vendoreado) + WeaveDemo verificada in-game. Hallazgo 12.0.7: UnitHealth/UnitHealthMax secret SIEMPRE en código de addon → patrón sink-directo (§9). taintlint corre local (Node 24 LTS instalado). |

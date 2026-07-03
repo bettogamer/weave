@@ -69,11 +69,17 @@ bind o elemento `ui` creado dentro de `scope:run(fn)` queda adscrito al scope;
 
 ## 2. Capa WoW (`Weave/wow/` — eventos y bindings)
 
-### `Weave.fromEvent(event, map?) → Signal` · `Weave.fromUnitEvent(event, unit, map?) → Signal`
+### `Weave.fromEvent(event, map?, opts?) → Signal` · `Weave.fromUnitEvent(event, unit, map?, opts?) → Signal`
 
-Señal alimentada por un evento del juego. Un solo frame interno multiplexa todos los
-registros (`RegisterUnitEvent` cuando hay unit). `map(...)` transforma los args del evento
-en el valor de la señal (default: primer arg).
+Señal alimentada por un evento del juego. Un frame interno compartido multiplexa los
+eventos globales; los eventos de unidad usan un frame por par (evento, unit), porque
+`RegisterUnitEvent` admite máximo 2 units por frame. `map(...)` transforma los args del
+evento en el valor de la señal (default: primer arg).
+
+- `opts` = las opts de signal (`fallback`, `equals` — taint-aware, §3) + `initial`:
+  valor de arranque de `fromEvent` antes del primer evento (default `nil`).
+- `fromUnitEvent` se **siembra** al crearse (llama `map(unit)` una vez) para que el
+  valor exista antes del primer evento — por eso no necesita `initial`.
 
 ```lua
 local hp = Weave.fromUnitEvent("UNIT_HEALTH", "player",
@@ -83,8 +89,10 @@ local hp = Weave.fromUnitEvent("UNIT_HEALTH", "player",
 
 ### `Weave.bind(frame, prop, source) → EffectHandle`
 
-Azúcar sobre `effect`: conecta una señal/computed a una propiedad del frame vía el registro
-de props. **Nunca crea frames** (combat-safe; el frame ya existe).
+Azúcar sobre `effect`: conecta una señal/computed (o cualquier llamable) a una propiedad
+del frame vía el registro de props. **Nunca crea frames** (combat-safe; el frame ya
+existe). Las props de varios args (`minMax`, `vertexColor`, `statusBarColor`) reciben una
+tabla y la desempaquetan: `W.signal({ 0, 1 })` → `SetMinMaxValues(0, 1)`.
 
 ```lua
 Weave.bind(bar, "value", pct)
@@ -100,14 +108,20 @@ Weave.props.register("glow", function(frame, v) --[[ aplicar ]] end)
 
 ### `Weave.onUpdate(interval) → Signal`
 
-Señal de tiempo throttleada (ticker compartido) para countdowns/duraciones. `interval` en
-segundos (mín. efectivo ~0.05). Solo tickea si tiene suscriptores vivos.
+Señal de tiempo throttleada (un único frame ticker compartido) para countdowns/duraciones.
+`interval` en segundos (mín. efectivo ~0.05). Su valor es el `GetTime()` del último tick;
+nace sembrada con la hora actual. Solo tickea si tiene suscriptores vivos, y **el mismo
+intervalo devuelve la misma señal** (se comparte).
 
 ### Chokepoint de errores (automático, ADR-0003)
 
-Todo effect/bind corre bajo un handler: error cuyo mensaje contiene `"a secret"` o
-`"ForceTaint_Strong"` → ese effect degrada (una advertencia soft por sitio, no popup, y el
-computed fuente expone su `fallback` si lo tiene). Cualquier otro error se propaga intacto.
+Todo effect (y por tanto todo bind) corre bajo un handler **en el core**: si el error
+contiene `"a secret"` o `"ForceTaint_Strong"`, el effect degrada — se traga el error,
+conserva sus dependencias (revive solo cuando vuelven valores normales) y avisa **una vez
+por sitio**. Cualquier otro error se propaga intacto. La parte visible del aviso la inyecta
+la capa wow con `Weave._setSecretWarning(fn)` (mismo patrón que el detector, §3); headless
+la degradación es silenciosa. Limitación conocida: un fn que explota antes de leer ninguna
+señal queda sin dependencias y no revive.
 
 ## 3. Semántica taint (tabla de verdad — ADR-0003)
 

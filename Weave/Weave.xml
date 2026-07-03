@@ -1,0 +1,8 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- Load order matters: core first, then the wow/ layer (mirrors tests/helper). -->
+	<Script file="Weave.lua"/>
+	<Script file="core\Core.lua"/>
+	<Script file="wow\Events.lua"/>
+	<Script file="wow\Props.lua"/>
+	<Script file="wow\Ticker.lua"/>
+</Ui>

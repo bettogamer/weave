@@ -6,17 +6,22 @@
 
 ## Estado actual (handoff — actualizar al cerrar cada sesión)
 
-- **M0 COMPLETO** (2026-07-03): `Weave/core/Core.lua` entero — signal, computed (lazy,
-  cache, corte por igualdad, diamante sin glitches), effect, batch, scope, y semántica
-  taint (fallback declarado, `isSecret()`, degradación de computeds, detector inyectable
-  `_setSecretDetector`). **49 tests en verde, 0 warnings.** `dev` mergeado a `main`.
-- **Siguiente: M1 — capa `Weave/wow/`**: `fromEvent`/`fromUnitEvent`, `bind` + registro de
-  props, `onUpdate`, chokepoint de errores en effects, e inyectar `issecretvalue` real al
-  detector. Cierre del hito: la demo canónica (API-v0 §7, versión mínima) corriendo
-  in-game con `/reload` — el testing headless de wow/ usa mock mínimo de frames (los tests
-  de core/ JAMÁS mockean, ver abajo).
-- Leer antes de empezar M1: `docs/API-v0.md` §2 (la superficie a implementar) y
-  `tests/core/taint_spec.lua` (cómo se simulan secrets headless).
+- **M1 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): capa `Weave/wow/` entera —
+  `fromEvent`/`fromUnitEvent` (multiplexado, siembra con `map(unit)`), `Weave.props` +
+  `bind` (10 built-in), `onUpdate` (ticker compartido, misma señal por intervalo),
+  chokepoint de secrets en effects (en el CORE, aviso inyectable `_setSecretWarning`) e
+  inyección del `issecretvalue` real. **91 tests en verde, 0 warnings, taintlint limpio.**
+  Weave empaquetada standalone (`Weave.toc`/`Weave.xml`, LibStub vendoreado en `libs/`) +
+  `demo/WeaveDemo` (barra de vida) + `scripts/deploy-local.ps1`. `dev` mergeado a `main`.
+- **Hallazgo clave 12.0.7** (verificado in-game): `UnitHealth`/`UnitHealthMax` devuelven
+  secret SIEMPRE en código de addon → un fallback numérico da "0%" permanente. Patrón:
+  señal SIN fallback → secret directo a los sinks (`SetValue`/`SetMinMaxValues` los
+  aceptan); texto/color con `isSecret()` → "??". Ver AGENTS.md §9 y CLAUDE.md global.
+- **Siguiente: M2 — taint end-to-end** (demo bajo ForceTaint sin errores Lua). Primer
+  bloque ya identificado y pendiente de OK: guard del `map` de usuario en el dispatch de
+  eventos (`Events.lua`) — hoy un `map` que OPERA un secret explota fuera del chokepoint
+  (popup). Tests primero, como siempre. Los 2 INFO SV010 de taintlint en la demo son
+  intencionales (propagación deliberada al sink).
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
@@ -43,6 +48,13 @@ luacheck Weave/Weave.lua Weave/core/Core.lua --config .luacheckrc
 # ↑ luacheck 1.2.0 instalado, pero NO puede escanear carpetas en esta máquina (sin lfs): pasar archivos explícitos
 
 luac -p <archivo>   # el lua local es 5.4: sirve para sintaxis, pero el target es 5.1 (luacheck std lua51 vigila)
+
+node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js Weave/Weave.toc
+node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js demo/WeaveDemo/WeaveDemo.toc
+# ↑ taintlint local (Node 24 LTS instalado 2026-07-03 vía winget; en shells abiertas antes de esa
+#   fecha usar la ruta completa "C:\Program Files\nodejs\node.exe"). Pasa por .toc, no por carpeta.
+
+powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo a F:\Games\...\AddOns → /reload
 ```
 
 ## Git — reglas para Claude Code en este repo

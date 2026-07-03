@@ -120,6 +120,64 @@ describe("computeds que degradan por secrets (fila 4 de la tabla)", function()
 
 end)
 
+describe("chokepoint de effects: un error de secret degrada, nunca crashea (ADR-0003)", function()
+
+  it("crear un effect sobre un secret vivo no lanza error Lua", function()
+    local W = loadWeaveWithDetector()
+    local s = W.signal(nil) -- no fallback: the secret circulates as-is
+    s:set(helper.newFakeSecret())
+    local sink
+    W.effect(function() sink = s() + 1 end) -- arithmetic on the secret: must degrade
+    assert_eq(sink, nil, "el effect degradó: no llegó a asignar nada")
+  end)
+
+  it("un set(secret) posterior tampoco propaga el error, y el estado bueno se conserva", function()
+    local W = loadWeaveWithDetector()
+    local s = W.signal(1)
+    local sink
+    W.effect(function() sink = s() + 1 end)
+    assert_eq(sink, 2)
+    s:set(helper.newFakeSecret()) -- must NOT raise
+    assert_eq(sink, 2, "el effect degradado conserva el último estado bueno")
+  end)
+
+  it("el effect degradado REVIVE cuando la dependencia vuelve a ser normal", function()
+    local W = loadWeaveWithDetector()
+    local s = W.signal(1)
+    local sink
+    W.effect(function() sink = s() + 1 end)
+    s:set(helper.newFakeSecret())
+    s:set(10)
+    assert_eq(sink, 11, "al volver un valor normal, el effect debe re-ejecutarse limpio")
+  end)
+
+  it("un error NO-secret dentro de un effect se propaga intacto", function()
+    local W = loadWeaveWithDetector()
+    assert_error(function()
+      W.effect(function() error("bug real del dev") end)
+    end, "bug real del dev")
+  end)
+
+  it("la advertencia inyectada con _setSecretWarning suena UNA sola vez por effect", function()
+    local W = loadWeaveWithDetector()
+    local warns = {}
+    W._setSecretWarning(function(err) warns[#warns + 1] = tostring(err) end)
+    local s = W.signal(1)
+    local sink
+    W.effect(function() sink = s() + 1 end)
+    s:set(helper.newFakeSecret())
+    s:set(helper.newFakeSecret()) -- same site blowing again: no second warning
+    assert_eq(#warns, 1, "una advertencia por sitio, no una por ejecución")
+    assert_true(warns[1]:find("a secret", 1, true) ~= nil, "el aviso lleva el error original")
+  end)
+
+  it("_setSecretWarning exige una función", function()
+    local W = helper.loadWeave()
+    assert_error(function() W._setSecretWarning("nope") end, "function")
+  end)
+
+end)
+
 describe("el detector inyectable (frontera core/wow)", function()
 
   it("sin detector inyectado, nada se considera secret (default seguro para clientes viejos)", function()
