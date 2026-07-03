@@ -94,7 +94,17 @@
 
 ## 9. Lecciones / errores comunes del proyecto
 
-_(vacío — se llena con los bugs dolorosos reales, formato: síntoma → causa → patrón correcto)_
+- **La demo muestra "0%" fijo sin ningún error Lua** → en 12.0.7 `UnitHealth`/`UnitHealthMax`
+  devuelven secret values SIEMPRE en código de addon (incluso fuera de combate, sin
+  ForceTaint), así que el `fallback` numérico declarado se convierte en el valor permanente →
+  patrón correcto: el fallback es para valores que se OPERAN; lo que solo se PINTA va como
+  señal **sin** fallback bindeada directo al sink que acepta secrets
+  (`SetValue`/`SetMinMaxValues`), y el texto/color derivado comprueba `isSecret()` y degrada
+  ("??" / color neutro). _Demo M1 (2026-07-03)._
+- **Tests de tiempo: nunca comparar contra literales decimales** → `1000 + 0.06 + 0.06 ≠
+  1000.12` en coma flotante (el runner muestra "esperado 1000.12, obtenido 1000.12") →
+  comparar contra la MISMA aritmética que hace el código (`t0 + dt1 + dt2`). _ticker_spec
+  (2026-07-03)._
 
 ## 10. Registro de cambios
 
