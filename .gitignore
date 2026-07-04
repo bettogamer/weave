@@ -1,5 +1,6 @@
 related-addons/
 *.zip
+dist/
 .claude/settings.local.json
 CLAUDE.local.md
 

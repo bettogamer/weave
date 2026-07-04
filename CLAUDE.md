@@ -23,15 +23,17 @@
   patrón sink-directo + `isSecret()` → "??". (2) `C_AddOns.IsAddOnLoaded(owner)` es true
   DURANTE la carga del propio addon → con la global nil, vigilar SIEMPRE el ADDON_LOADED
   del dueño y re-adoptar (el fix auto-curativo del store).
-- **Siguiente: M5 — `Weave/craft/`** (leer API-v0 §6, ADR-0004 y la regla global de
-  vendoring ANTES de proponer bloques): registrar props bindables para componentes
-  Craft — detección `LibStub("Craft-1.0", true)`, **no-op silencioso si Craft no
-  está**. v0 mínimo: `text` de Label/Button, `value` de Slider, `checked` de
-  Checkbox, `disabled` genérico. REGLA DURA: si un componente Craft no expone setter
-  público → **FR a `craft/docs/requests/`** y fallback, JAMÁS tocar internos
-  `_privados` (AGENTS §5 + CLAUDE.md global). Testing headless: mock mínimo de
-  componentes Craft (superficie pública solamente). Cierre del hito: página demo en
-  Craft_Browser (el build de Craft se vendorea, no se edita — regla global).
+- **M5 COMPLETO + RELEASE v0.1.0** (2026-07-03, ADR-0006): la capa `craft/` se eliminó
+  del alcance — Craft integrará Weave nativamente. Entregado: `scripts/build-embed.ps1`
+  (empaqueta `dist/Weave-vX.Y.Z/` con gates de suite+luacheck), `docs/
+  CRAFT-INTEGRATION.md` (inglés: embed, applyOrBind señal-o-literal, scope por
+  instancia, two-way sin bucles, taint, upgrade) y **tag `v0.1.0`** sobre main
+  (LibStub MINOR 2). El trabajo de integración en los componentes es del owner, EN el
+  repo de Craft, sobre el build etiquetado — validación del ADR: que lo logre solo
+  con la guía (si algo no encaja con la API real de Craft, ajustar la guía aquí).
+- **Siguiente: M6 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
+  (<60 líneas, 3 pisos) + README del repo. Tras M6, evaluar subir el proceso a
+  nivel L (pre-publicación) y el idioma de commits.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
