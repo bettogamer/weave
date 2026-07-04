@@ -1,7 +1,7 @@
 -- Weave.lua — entry point. Registers the library in LibStub.
 -- Every other file (core/, wow/, store/, ui/, craft/) hangs off this table.
 
-local MAJOR, MINOR = "Weave-1.0", 1
+local MAJOR, MINOR = "Weave-1.0", 2 -- MINOR bumps once per tagged release
 
 local Weave = LibStub:NewLibrary(MAJOR, MINOR)
 if not Weave then return end -- an equal or newer copy is already loaded

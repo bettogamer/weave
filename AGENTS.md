@@ -8,9 +8,12 @@
 > de regiones, `[Weave.children]`/`[Weave.on]`, restricción dura de combate, scopes) —
 > la demo canónica §7 verificada in-game en su forma final (una sola descripción, tres
 > pisos, /weavetaint intacto). 153 tests headless en verde, 0 warnings, taintlint
-> limpio. Siguiente entregable: **M5 (redefinido por ADR-0006) — paquete embebible +
-> guía de integración para Craft + release v0.1** (la capa `craft/` se ELIMINÓ del
-> alcance: Craft integrará Weave nativamente, embebiendo builds etiquetados).
+> limpio. **M5 COMPLETO (ADR-0006)**: paquete embebible (`scripts/build-embed.ps1`
+> con gates), guía de integración (`docs/CRAFT-INTEGRATION.md`, inglés) y
+> **release v0.1.0** (tag sobre main, LibStub MINOR 2). La integración en los
+> componentes es trabajo del owner EN el repo de Craft, sobre este build etiquetado.
+> Siguiente entregable: **M6 — docs para devs nuevos** (tutorial "tu primer addon
+> reactivo", <60 líneas, 3 pisos).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -131,3 +134,4 @@
 | v0.6 | 2026-07-03 | **M3 completo**: `store/` entero (133 tests) + persistencia verificada in-game. Bug real cazado: IsAddOnLoaded true durante la carga del propio addon (§9). Defaults nunca a disco; `_version` única clave propia; secrets jamás se persisten. |
 | v0.7 | 2026-07-03 | **M4 completo**: `ui/` entero (153 tests) + demo canónica §7 in-game en forma declarativa final. Descriptors perezosos para regiones (no pueden nacer sin padre); combate = error duro (no-op prod pendiente de flag); `_attachToScope` en el core. |
 | v0.8 | 2026-07-03 | **ADR-0006 (decisión del owner)**: Craft integrará Weave nativamente; la capa `craft/` se elimina del alcance de Weave. M5 redefinido: paquete embebible + guía de integración + release v0.1 (absorbe el viejo M6 de release). |
+| v0.9 | 2026-07-03 | **M5 completo + RELEASE v0.1.0**: build-embed.ps1 (gates: suite+luacheck), CRAFT-INTEGRATION.md, bump LibStub MINOR 2, tag `v0.1.0` sobre main. Weave lista para embeberse en Craft. |

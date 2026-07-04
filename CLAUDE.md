@@ -23,16 +23,17 @@
   patrón sink-directo + `isSecret()` → "??". (2) `C_AddOns.IsAddOnLoaded(owner)` es true
   DURANTE la carga del propio addon → con la global nil, vigilar SIEMPRE el ADDON_LOADED
   del dueño y re-adoptar (el fix auto-curativo del store).
-- **Siguiente: M5 REDEFINIDO por ADR-0006** (leerlo antes de empezar): la capa `craft/`
-  se ELIMINÓ — Craft integrará Weave nativamente (decisión del owner: componentes
-  nacidos reactivos, no adaptadores). Weave entrega tres cosas: (1) **paquete
-  embebible** — script de build que empaqueta `Weave/` para `Craft/libs/Weave/`
-  (modelo Ace3; el .xml ya existe, falta bump de MINOR LibStub y empaquetado),
-  (2) **guía de integración** para el autor de componentes (embed toc/xml, patrón
-  señal-o-literal con `isCallable`, scopes por ciclo de vida, reglas taint, ejemplos
-  Slider/Checkbox/Label), (3) **release v0.1** (tag semver sobre main — absorbe el
-  viejo M6 de release). Condición dura: Craft solo embebe builds ETIQUETADOS, jamás
-  dev. Cierre: el owner actualiza su primer componente Craft solo con la guía.
+- **M5 COMPLETO + RELEASE v0.1.0** (2026-07-03, ADR-0006): la capa `craft/` se eliminó
+  del alcance — Craft integrará Weave nativamente. Entregado: `scripts/build-embed.ps1`
+  (empaqueta `dist/Weave-vX.Y.Z/` con gates de suite+luacheck), `docs/
+  CRAFT-INTEGRATION.md` (inglés: embed, applyOrBind señal-o-literal, scope por
+  instancia, two-way sin bucles, taint, upgrade) y **tag `v0.1.0`** sobre main
+  (LibStub MINOR 2). El trabajo de integración en los componentes es del owner, EN el
+  repo de Craft, sobre el build etiquetado — validación del ADR: que lo logre solo
+  con la guía (si algo no encaja con la API real de Craft, ajustar la guía aquí).
+- **Siguiente: M6 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
+  (<60 líneas, 3 pisos) + README del repo. Tras M6, evaluar subir el proceso a
+  nivel L (pre-publicación) y el idioma de commits.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
