@@ -6,29 +6,32 @@
 
 ## Estado actual (handoff — actualizar al cerrar cada sesión)
 
-- **M3 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): `Weave/store/Store.lua` entero —
-  SavedVariables reactivas (cada campo señal, write-through a la tabla que WoW
-  serializa), coreografía de hidratación (staging → re-adopción en `ADDON_LOADED` →
-  re-sync en vivo; lo guardado gana; primera ejecución reclama), sub-stores anidados
-  (sub-tablas materializadas solo al escribir), `version`/`migrate` (antes del re-sync),
-  defaults NUNCA a disco, secrets JAMÁS se persisten (aviso y skip). Demo: `/weavewidth`
-  persistente verificado (sobrevive /reload y logout). **133 tests en verde, 0 warnings,
-  taintlint limpio** (2 INFO SV010 intencionales en la demo). Detrás: M2 (taint
-  end-to-end bajo ForceTaint, `/weavetaint`), M1 (capa wow + demo + deploy-local).
+- **M4 COMPLETO y VERIFICADO IN-GAME** (2026-07-03): `Weave/ui/Ui.lua` entero —
+  `Weave.new` declarativo (props de creación `parent`/`name`/`template`/`size`/
+  `point`/`points`/`layer`; registro COMPARTIDO con bind vía `props._get`/
+  `_isCallable`: literal una vez, señal/computed bindeada), regiones como
+  **descriptors perezosos** (FontString/Texture no pueden nacer sin padre:
+  `[Weave.children]` los materializa; con `parent` en props, en el acto),
+  `[Weave.on]` scripts, combate = error DURO (no-op prod pendiente de flag),
+  scopes ocultan el frame al dispose (`_attachToScope` en el core). La demo es la
+  canónica §7 en forma final: UNA descripción, tres pisos, `statusBarTexture` como
+  demo de `props.register`. **153 tests en verde, 0 warnings, taintlint limpio**
+  (2 INFO SV010 intencionales). Detrás: M3 (store), M2 (ForceTaint), M1 (wow).
   `dev` mergeado a `main`.
 - **Hallazgos clave 12.0.7** (verificados in-game, detalle en AGENTS.md §9 y CLAUDE.md
   global): (1) `UnitHealth`/`UnitHealthMax` son secret SIEMPRE en código de addon →
   patrón sink-directo + `isSecret()` → "??". (2) `C_AddOns.IsAddOnLoaded(owner)` es true
   DURANTE la carga del propio addon → con la global nil, vigilar SIEMPRE el ADDON_LOADED
   del dueño y re-adoptar (el fix auto-curativo del store).
-- **Siguiente: M4 — `Weave/ui/`** (leer API-v0 §4 antes de proponer bloques):
-  `Weave.new(frameType, props)` — crea el frame Y aplica/bindea props en una sola
-  descripción (literal → una vez; señal/computed → bind). MISMO registro de props que
-  `bind` (una sola verdad). Props especiales: `parent`, `template`, `name`, `size`,
-  `point`/`points`, `layer`, `[Weave.children]`, `[Weave.on]` (scripts). Restricción
-  DURA: `Weave.new` en combate → error dev / no-op con warning (AGENTS §5). Elementos
-  creados en `scope:run()` se adscriben al scope. Cierre del hito: la demo canónica
-  COMPLETA de §7 in-game (~20 líneas, cero handlers).
+- **Siguiente: M5 — `Weave/craft/`** (leer API-v0 §6, ADR-0004 y la regla global de
+  vendoring ANTES de proponer bloques): registrar props bindables para componentes
+  Craft — detección `LibStub("Craft-1.0", true)`, **no-op silencioso si Craft no
+  está**. v0 mínimo: `text` de Label/Button, `value` de Slider, `checked` de
+  Checkbox, `disabled` genérico. REGLA DURA: si un componente Craft no expone setter
+  público → **FR a `craft/docs/requests/`** y fallback, JAMÁS tocar internos
+  `_privados` (AGENTS §5 + CLAUDE.md global). Testing headless: mock mínimo de
+  componentes Craft (superficie pública solamente). Cierre del hito: página demo en
+  Craft_Browser (el build de Craft se vendorea, no se edita — regla global).
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
