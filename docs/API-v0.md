@@ -4,7 +4,8 @@
 > Cambios a esta superficie → actualizar aquí + ADR si es decisión de fondo.
 > Convención: `s()` lee (y trackea), `s:set(v)` escribe, `s:peek()` lee sin trackear.
 >
-> Alcance v0 por ADR-0005: **core + wow + ui + store** (+ craft opcional).
+> Alcance v0 por ADR-0005: **core + wow + ui + store** (la capa craft se eliminó por
+> ADR-0006: Craft integra Weave nativamente, embebiendo builds etiquetados).
 > El flujo completo: `evento del juego → store/signals → computeds → UI declarativa`.
 
 ## 1. Core (`Weave/core/` — Lua puro, cero API de WoW)
@@ -228,12 +229,14 @@ Weave.bind(frame, "scale", db.scale)
   → error claro. **Un secret jamás se persiste**: `set(secret)` en un campo de store
   avisa suave y salta la escritura (señal y SV intactas).
 
-## 6. Capa Craft (`Weave/craft/` — OPCIONAL, ADR-0004)
+## 6. Integración con Craft (ADR-0006 — SIN capa en Weave)
 
-Registra props bindables para componentes Craft (detecta `LibStub("Craft-1.0", true)`; no-op
-si falta). v0 mínimo: `text` de Label/Button, `value` de Slider, `checked` de Checkbox,
-`disabled` genérico. Si un componente Craft no expone setter público para algo bindable →
-**FR a Craft** (proceso estándar), no hack de internos.
+La capa `craft/` de adaptadores fue **eliminada** (decisión del owner, ADR-0006): Craft
+integra Weave nativamente — sus componentes aceptan señales como props porque embeben un
+**build etiquetado** de Weave en `Craft/libs/Weave/` (modelo Ace3/LibStub). Weave no
+contiene ni contendrá código que conozca a Craft; sus entregables para esta integración
+son el paquete embebible, la guía de integración para autores de componentes y las
+releases etiquetadas (ver el ADR).
 
 ## 7. Ejemplo completo (la demo canónica, con los tres pisos)
 
@@ -278,5 +281,5 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 | M2 | taint end-to-end | demo bajo ForceTaint (macro loadstring) sin errores Lua |
 | M3 | `store/` (persistencia + migraciones) | busted con SV simuladas + prueba in-game de persistencia |
 | M4 | `ui/` (`W.new`, children, scripts, scopes) | demo canónica §7 completa in-game |
-| M5 | `craft/` + FRs a Craft si hacen falta | página demo en Craft_Browser |
-| M6 | docs para devs nuevos + release v0.1 | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |
+| M5 | paquete embebible + guía de integración Craft + release v0.1 (ADR-0006; absorbe el viejo M6) | el owner actualiza su primer componente Craft solo con la guía; página demo en Craft_Browser (en el repo de Craft) |
+| M6 | docs para devs nuevos | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |

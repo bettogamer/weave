@@ -23,15 +23,16 @@
   patrón sink-directo + `isSecret()` → "??". (2) `C_AddOns.IsAddOnLoaded(owner)` es true
   DURANTE la carga del propio addon → con la global nil, vigilar SIEMPRE el ADDON_LOADED
   del dueño y re-adoptar (el fix auto-curativo del store).
-- **Siguiente: M5 — `Weave/craft/`** (leer API-v0 §6, ADR-0004 y la regla global de
-  vendoring ANTES de proponer bloques): registrar props bindables para componentes
-  Craft — detección `LibStub("Craft-1.0", true)`, **no-op silencioso si Craft no
-  está**. v0 mínimo: `text` de Label/Button, `value` de Slider, `checked` de
-  Checkbox, `disabled` genérico. REGLA DURA: si un componente Craft no expone setter
-  público → **FR a `craft/docs/requests/`** y fallback, JAMÁS tocar internos
-  `_privados` (AGENTS §5 + CLAUDE.md global). Testing headless: mock mínimo de
-  componentes Craft (superficie pública solamente). Cierre del hito: página demo en
-  Craft_Browser (el build de Craft se vendorea, no se edita — regla global).
+- **Siguiente: M5 REDEFINIDO por ADR-0006** (leerlo antes de empezar): la capa `craft/`
+  se ELIMINÓ — Craft integrará Weave nativamente (decisión del owner: componentes
+  nacidos reactivos, no adaptadores). Weave entrega tres cosas: (1) **paquete
+  embebible** — script de build que empaqueta `Weave/` para `Craft/libs/Weave/`
+  (modelo Ace3; el .xml ya existe, falta bump de MINOR LibStub y empaquetado),
+  (2) **guía de integración** para el autor de componentes (embed toc/xml, patrón
+  señal-o-literal con `isCallable`, scopes por ciclo de vida, reglas taint, ejemplos
+  Slider/Checkbox/Label), (3) **release v0.1** (tag semver sobre main — absorbe el
+  viejo M6 de release). Condición dura: Craft solo embebe builds ETIQUETADOS, jamás
+  dev. Cierre: el owner actualiza su primer componente Craft solo con la guía.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
