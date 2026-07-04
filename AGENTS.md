@@ -3,12 +3,13 @@
 > README ejecutable para agentes de IA. Fuente de verdad única: si cambia una decisión,
 > este archivo y el ADR correspondiente se actualizan en el mismo commit.
 >
-> **Estado del proyecto: IMPLEMENTACIÓN.** **M3 COMPLETO**: `store/` entero
-> (SavedVariables reactivas: write-through, hidratación con ADDON_LOADED, sub-stores
-> anidados, version/migrate, secrets nunca a disco) — persistencia verificada in-game
-> (`/weavewidth` sobrevive a /reload y logout). 133 tests headless en verde, 0 warnings,
-> taintlint limpio. Siguiente entregable: **M4 — `ui/`** (`Weave.new`: creación
-> declarativa de frames, API-v0 §4; cierra con la demo canónica completa de §7).
+> **Estado del proyecto: IMPLEMENTACIÓN.** **M4 COMPLETO**: `ui/` entero (`Weave.new`
+> declarativo: props de creación, registro compartido con bind, descriptors perezosos
+> de regiones, `[Weave.children]`/`[Weave.on]`, restricción dura de combate, scopes) —
+> la demo canónica §7 verificada in-game en su forma final (una sola descripción, tres
+> pisos, /weavetaint intacto). 153 tests headless en verde, 0 warnings, taintlint
+> limpio. Siguiente entregable: **M5 — `craft/`** (props bindables para componentes
+> Craft, API-v0 §6; detección LibStub, no-op sin Craft; FR a Craft si falta setter).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -126,3 +127,4 @@
 | v0.4 | 2026-07-03 | **M1 completo**: capa `wow/` entera (91 tests) + Weave empaquetada standalone (toc/xml, LibStub vendoreado) + WeaveDemo verificada in-game. Hallazgo 12.0.7: UnitHealth/UnitHealthMax secret SIEMPRE en código de addon → patrón sink-directo (§9). taintlint corre local (Node 24 LTS instalado). |
 | v0.5 | 2026-07-03 | **M2 completo**: guard de secrets en maps de eventos (`_isSecretError` compartido core→wow; 97 tests) + `/weavetaint` verificado in-game — pipeline entero bajo ForceTaint_Strong con secrets reales, cero popups. |
 | v0.6 | 2026-07-03 | **M3 completo**: `store/` entero (133 tests) + persistencia verificada in-game. Bug real cazado: IsAddOnLoaded true durante la carga del propio addon (§9). Defaults nunca a disco; `_version` única clave propia; secrets jamás se persisten. |
+| v0.7 | 2026-07-03 | **M4 completo**: `ui/` entero (153 tests) + demo canónica §7 in-game en forma declarativa final. Descriptors perezosos para regiones (no pueden nacer sin padre); combate = error duro (no-op prod pendiente de flag); `_attachToScope` en el core. |

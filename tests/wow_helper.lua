@@ -14,11 +14,15 @@ M.isFakeSecret  = core.isFakeSecret
 
 local frames -- every mock frame created since the last loadWeaveWow()
 
-local function newFrame()
+local function newFrame(frameType, name, parent, template)
   local f = {
+    -- creation args, recorded for the Weave.new specs
+    _type = frameType, _name = name, _parent = parent, _template = template,
     -- event -> true (RegisterEvent) or { unit1, unit2 } (RegisterUnitEvent)
     _events  = {},
     _scripts = {},
+    _points  = {}, -- every SetPoint call, in order
+    _shown   = true,
   }
   function f:RegisterEvent(event) self._events[event] = true end
   function f:RegisterUnitEvent(event, unit1, unit2)
@@ -28,8 +32,28 @@ local function newFrame()
   function f:UnregisterEvent(event) self._events[event] = nil end
   function f:SetScript(handler, fn) self._scripts[handler] = fn end
   function f:GetScript(handler) return self._scripts[handler] end
-  function f:Hide() end
-  function f:Show() end
+  function f:Hide() self._shown = false end
+  function f:Show() self._shown = true end
+  function f:IsShown() return self._shown end
+  function f:SetParent(p) self._parent = p end
+  function f:GetParent() return self._parent end
+  function f:SetSize(w, h) self._size = { w, h } end
+  function f:SetPoint(...) self._points[#self._points + 1] = { ... } end
+  -- Regions: created THROUGH their parent, like the real client (f._regions
+  -- records them in creation order; they reuse the same mock surface).
+  f._regions = {}
+  local function newRegion(regionType, name, layer, template)
+    local r = newFrame(regionType, name, f, template)
+    r._layer = layer
+    f._regions[#f._regions + 1] = r
+    return r
+  end
+  function f:CreateFontString(name, layer, template)
+    return newRegion("FontString", name, layer, template)
+  end
+  function f:CreateTexture(name, layer, template)
+    return newRegion("Texture", name, layer, template)
+  end
   -- Prop setters: they only RECORD what was applied (specs read f._set.<prop>);
   -- the mock asserts nothing about rendering, just that the right call happened.
   f._set = {}
@@ -78,6 +102,13 @@ function M.advanceTime(dt)
   end
 end
 
+local inCombat = false
+
+--- Toggles the fake InCombatLockdown() state (reset to false by loadWeaveWow()).
+function M.setInCombat(v)
+  inCombat = v and true or false
+end
+
 local addonsLoaded -- set of addon names already "loaded", reset by loadWeaveWow()
 
 --- Marks an addon as already loaded WITHOUT firing ADDON_LOADED (for specs where
@@ -113,6 +144,7 @@ local WOW_FILES = {
   "Weave/wow/Props.lua",
   "Weave/wow/Ticker.lua",
   "Weave/store/Store.lua",
+  "Weave/ui/Ui.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.
@@ -121,10 +153,13 @@ local WOW_FILES = {
 function M.loadWeaveWow(opts)
   frames = {}
   _G.CreateFrame = function(frameType, name, parent, template)
-    local f = newFrame()
+    local f = newFrame(frameType, name, parent, template)
     frames[#frames + 1] = f
     return f
   end
+  _G.UIParent = newFrame("Frame", "UIParent") -- not counted in frameCount()
+  inCombat = false
+  _G.InCombatLockdown = function() return inCombat end
   _G.issecretvalue = opts and opts.issecretvalue or nil
   now = 1000 -- arbitrary non-zero start, so specs can't rely on time starting at 0
   _G.GetTime = function() return now end

@@ -171,10 +171,10 @@ local bar = Weave.new("StatusBar", {
 - Usa el MISMO registro de props que `bind` (una sola verdad de cómo se aplica cada prop).
 - Props especiales de creación: `parent` (default `UIParent`), `template`, `name`,
   `size`, `point`/`points`, `layer` (para regiones), `[Weave.children]`, `[Weave.on]`.
-- **Restricción de combate (dura):** `Weave.new` con `InCombatLockdown()` → error claro en
-  dev / no-op con warning en producción. La creación declarativa es para construcción de UI
-  fuera de combate; EN combate solo mutan los binds. (Listas dinámicas en combate → `each`
-  con pooling, v1.)
+- **Restricción de combate (dura):** `Weave.new` con `InCombatLockdown()` → error claro
+  (v0: siempre; el modo no-op con warning para producción queda pendiente de un flag de
+  build). La creación declarativa es para construcción de UI fuera de combate; EN combate
+  solo mutan los binds. (Listas dinámicas en combate → `each` con pooling, v1.)
 - Elementos creados dentro de un `scope:run()` quedan adscritos al scope (sus binds se
   liberan con él; el frame se oculta y queda reutilizable).
 

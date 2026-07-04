@@ -40,6 +40,10 @@ local function isCallable(v)
   return type(mt) == "table" and mt.__call ~= nil
 end
 
+-- Internal (ui layer): registry lookup and the callable test keep ONE definition.
+Weave.props._get = function(name) return registry[name] end
+Weave.props._isCallable = isCallable
+
 function Weave.bind(frame, prop, source)
   if type(frame) ~= "table" then
     error("Weave.bind: expected a frame (table), got " .. type(frame), 2)
