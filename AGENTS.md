@@ -15,8 +15,11 @@
 > **M6 COMPLETO + RELEASE v0.2.0**: `Weave.each` (ADR-0007, adelantado de v1 por
 > demanda real de Coffer y Craft) — reconciliador puro por keys en `core/Reconcile.lua`
 > + pooling combat-safe en `ui/Each.lua`; 180 tests; verificado in-game (lista
-> dinámica, secrets, combate con overflow y catch-up). Siguiente entregable:
-> **M7 — docs para devs nuevos** (tutorial "tu primer addon reactivo", <60 líneas).
+> dinámica, secrets, combate con overflow y catch-up). **FR Craft + RELEASE v0.3.0**
+> (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core)
+> para consumidores "señal-o-literal"; `props._isCallable` delega en ellos; 192 tests.
+> Siguiente entregable: **M7 — docs para devs nuevos** (tutorial "tu primer addon
+> reactivo", <60 líneas).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -141,3 +144,4 @@
 | v0.9 | 2026-07-03 | **M5 completo + RELEASE v0.1.0**: build-embed.ps1 (gates: suite+luacheck), CRAFT-INTEGRATION.md, bump LibStub MINOR 2, tag `v0.1.0` sobre main. Weave lista para embeberse en Craft. |
 | v0.10 | 2026-07-05 | **ADR-0007 (decisión del owner)**: `Weave.each` se adelanta de v1 a **M6** (demanda real: Coffer y Craft chocaron con el límite); docs para devs nuevos → M7. `each` cerrará con release v0.2.0. |
 | v0.11 | 2026-07-05 | **M6 completo + RELEASE v0.2.0**: `Weave.each` (core/Reconcile.lua puro + ui/Each.lua; render 1 vez por fila, datos por señales item/index, keying opcional, layout de pila, combate solo-recicla con catch-up en PLAYER_REGEN_ENABLED, opts.warm). 180 tests; demo `/weavelist` verificada in-game. CRAFT-INTEGRATION §4.5; bump LibStub MINOR 3; tag `v0.2.0` sobre main. |
+| v0.12 | 2026-07-05 | **FR Craft + RELEASE v0.3.0** (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core) para consumidores "señal-o-literal"; semántica estructural; `props._isCallable` delega en ellos (una sola definición). API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6; 12 tests (192 total); bump LibStub MINOR 4; tag `v0.3.0` sobre main. |

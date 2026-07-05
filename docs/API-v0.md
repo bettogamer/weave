@@ -56,6 +56,24 @@ Agrupa escrituras: los effects corren UNA vez al final, no por cada `set()`.
 Weave.batch(function() hp:set(50); hpMax:set(200) end)  -- pct notifica 1 vez
 ```
 
+### `Weave.isReactive(v) → boolean` · `Weave.isWritable(v) → boolean`
+
+Predicados públicos para consumidores que aceptan **"señal-o-literal"** (p. ej. Craft en
+las props de sus componentes). Evitan que el consumidor hurgue en la forma interna de un
+signal: es Weave quien conoce sus tipos.
+
+```lua
+Weave.isReactive(hp)             -- true: signal, computed o función (lo que effect observa)
+Weave.isReactive(80)             -- false: escalar → pintar una vez, no bindear
+Weave.isWritable(hp)             -- true: es un signal (tiene :set) → two-way posible
+Weave.isWritable(pct)            -- false: computed es read-only
+```
+
+- `isReactive(v)` — `true` para función o cualquier tabla callable (metatabla `__call`):
+  signals y computeds incluidos. `false` para escalares y tablas planas.
+- `isWritable(v)` — subconjunto: `true` solo para un signal (reactivo con método `:set`).
+  Computeds y funciones → `false`. `isWritable ⊆ isReactive`.
+
 ### `Weave.scope() → Scope` · `scope:run(fn)` · `scope:dispose()`
 
 Ownership de effects/binds (WoW no tiene unmount: el disposal es explícito). Todo effect,

@@ -32,17 +32,11 @@ Weave.props.register("texture", function(f, v) f:SetTexture(v) end)
 Weave.props.register("vertexColor",    function(f, v) f:SetVertexColor(v[1], v[2], v[3], v[4]) end)
 Weave.props.register("statusBarColor", function(f, v) f:SetStatusBarColor(v[1], v[2], v[3], v[4]) end)
 
--- Signals and computeds are tables made callable via __call; plain functions are
--- accepted too (they read their signals inside, tracking works the same).
-local function isCallable(v)
-  if type(v) == "function" then return true end
-  local mt = getmetatable(v)
-  return type(mt) == "table" and mt.__call ~= nil
-end
-
 -- Internal (ui layer): registry lookup and the callable test keep ONE definition.
+-- The callable test IS the public Weave.isReactive (core) — signals/computeds and
+-- plain functions all count; consumers stay decoupled from the internal shape.
 Weave.props._get = function(name) return registry[name] end
-Weave.props._isCallable = isCallable
+Weave.props._isCallable = Weave.isReactive
 
 function Weave.bind(frame, prop, source)
   if type(frame) ~= "table" then
@@ -55,7 +49,7 @@ function Weave.bind(frame, prop, source)
   if not apply then
     error(("Weave.bind: unknown prop '%s' — add it with Weave.props.register"):format(prop), 2)
   end
-  if not isCallable(source) then
+  if not Weave.isReactive(source) then
     error("Weave.bind: source must be callable (a signal, computed or function), got " .. type(source), 2)
   end
   return Weave.effect(function()
