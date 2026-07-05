@@ -59,10 +59,11 @@
 ## Comandos reales de esta máquina
 
 ```bash
-lua tests/run.lua tests/core/signal_spec.lua tests/core/computed_spec.lua tests/core/scope_spec.lua tests/core/taint_spec.lua
-# ↑ suite completa (mini-runner propio: busted NO instala aquí — falta compilador C; busted queda para CI Linux)
+lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.lua tests/ui/*_spec.lua
+# ↑ suite completa, 180 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
+#   queda para CI Linux). Los globs los expande la shell (Bash); en PowerShell enumerar los archivos.
 
-luacheck Weave/Weave.lua Weave/core/Core.lua --config .luacheckrc
+luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
 # ↑ luacheck 1.2.0 instalado, pero NO puede escanear carpetas en esta máquina (sin lfs): pasar archivos explícitos
 
 luac -p <archivo>   # el lua local es 5.4: sirve para sintaxis, pero el target es 5.1 (luacheck std lua51 vigila)

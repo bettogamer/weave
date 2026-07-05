@@ -39,6 +39,7 @@ local function newFrame(frameType, name, parent, template)
   function f:GetParent() return self._parent end
   function f:SetSize(w, h) self._size = { w, h } end
   function f:SetPoint(...) self._points[#self._points + 1] = { ... } end
+  function f:ClearAllPoints() self._points = {} end
   -- Regions: created THROUGH their parent, like the real client (f._regions
   -- records them in creation order; they reuse the same mock surface).
   f._regions = {}
@@ -145,6 +146,7 @@ local WOW_FILES = {
   "Weave/wow/Ticker.lua",
   "Weave/store/Store.lua",
   "Weave/ui/Ui.lua",
+  "Weave/ui/Each.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.

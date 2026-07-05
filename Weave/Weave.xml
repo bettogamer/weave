@@ -2,9 +2,11 @@
 	<!-- Load order matters: core first, then the wow/ layer (mirrors tests/helper). -->
 	<Script file="Weave.lua"/>
 	<Script file="core\Core.lua"/>
+	<Script file="core\Reconcile.lua"/>
 	<Script file="wow\Events.lua"/>
 	<Script file="wow\Props.lua"/>
 	<Script file="wow\Ticker.lua"/>
 	<Script file="store\Store.lua"/>
 	<Script file="ui\Ui.lua"/>
+	<Script file="ui\Each.lua"/>
 </Ui>
