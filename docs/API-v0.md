@@ -179,6 +179,59 @@ local bar = Weave.new("StatusBar", {
 - Elementos creados dentro de un `scope:run()` quedan adscritos al scope (sus binds se
   liberan con él; el frame se oculta y queda reutilizable).
 
+### `Weave.each(source, render, opts?) → EachDescriptor` (M6 — ADR-0007)
+
+Lista reactiva con frame pooling combat-safe. `source` es una señal/computed (o cualquier
+llamable) que devuelve un **array denso** (`{v1, v2, ...}`); una tabla literal vale y se
+aplica una vez (coherencia señal-o-literal de `bind`/`Weave.new`). Devuelve un
+**descriptor perezoso** (como las regiones de M4): dentro de `[Weave.children]` lo
+materializa el padre; con `opts.parent`, en el acto.
+
+```lua
+W.new("Frame", {
+  size = { 300, 400 },
+  [W.children] = {
+    W.each(items, function(item, index)
+      -- corre UNA sola vez por fila del pool; item/index son SEÑALES read-only
+      return W.new("Button", { size = { 280, 24 },
+        [W.children] = {
+          W.new("FontString", { layer = "OVERLAY", point = { "LEFT" },
+            text = W.computed(function() return item().name end) }),
+        },
+      })
+    end),
+  },
+})
+```
+
+- **`render(item, index) → frame`** corre **una vez por fila del pool** (al materializarla,
+  nunca por cambio de datos): crea el frame de la fila y deja los binds enchufados a las
+  señales `item`/`index`. Cuando la lista cambia, `each` NO toca frames: **re-asigna
+  datos** (set en las señales de cada fila; `equals` corta lo que no cambió), materializa
+  filas nuevas solo si hacen falta y esconde las sobrantes en el pool (ocultas,
+  reutilizables, con sus binds vivos).
+- **Identidad (keying):** default **por posición** (fila i ↔ dato i — el caso ventana de
+  scroll). `opts.key = function(item) → string|number` da identidad estable: al
+  reordenar/filtrar, cada dato conserva SU frame (estado visual incluido) y `each`
+  re-posiciona. Claves duplicadas → error claro en dev. Si `key(item)` devuelve un
+  secret o lanza por secret (un secret no puede ser key de tabla — catálogo global de
+  taint), esa reconciliación degrada a índice con aviso una vez.
+- **Layout:** pila vertical simple (fila i+1 anclada bajo la fila i; `opts.spacing`,
+  default 0). `opts.layout = false` la desactiva (el consumidor posiciona — caso
+  DragList de Craft). Nada más en v0.2: grids/scroll no son de `each`.
+- **Virtualización = composición, no feature:** para listas grandes, la ventana visible
+  es un computed que recorta (`scrollPos` señal + slice) y `each` por índice pinta solo
+  esa ventana — el pool queda fijo en N filas visibles que se re-rellenan (patrón Sorted,
+  con la seguridad que a Sorted le falta).
+- **Combate (la razón de ser del pooling):** reusar/re-asignar/ocultar/re-posicionar es
+  combat-safe; **materializar filas nuevas NO**. Si la lista crece en combate y el pool
+  no alcanza: pinta lo que el pool permita, avisa una vez (canal del chokepoint) y
+  completa la reconciliación sola al salir de combate (`PLAYER_REGEN_ENABLED`).
+  `opts.warm = n` pre-materializa n filas al crearse (fuera de combate) para absorber
+  crecimiento en combate.
+- **Disposal:** el descriptor queda adscrito al scope activo (como todo en `ui/`);
+  `dispose()` libera binds de todas las filas y oculta los frames.
+
 ## 5. Estado persistente (`Weave/store/` — W3, ADR-0005)
 
 ### `Weave.store(svName, defaults, opts?) → Store`
@@ -269,8 +322,8 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 ## 8. Fuera de alcance v0.1 (explícito — ADR-0005, reordenado por ADR-0007)
 
 - **M6 / v0.2.0 (adelantado por ADR-0007):** `Weave.each` — listas reactivas con frame
-  pooling combat-safe (W2). Spec pendiente de diseño (se añadirá aquí como §nueva antes
-  de los tests).
+  pooling combat-safe (W2). Spec en §4 (diseñada contra los casos reales de Coffer y
+  Craft, 2026-07-05).
 - **v2:** DevTools in-game `/weave` (W4) · `throttle`/`debounce`/`delay` (W5).
 - **Nunca** (north-star): async/promesas, red/comm, ciclo de vida de addon, slash commands.
 
