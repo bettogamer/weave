@@ -31,15 +31,20 @@
   (LibStub MINOR 2). El trabajo de integración en los componentes es del owner, EN el
   repo de Craft, sobre el build etiquetado — validación del ADR: que lo logre solo
   con la guía (si algo no encaja con la API real de Craft, ajustar la guía aquí).
-- **Siguiente: M6 — `Weave.each`** (ADR-0007, 2026-07-05): adelantado de v1 porque dos
-  consumidores reales (Coffer y la integración Craft) chocaron con el límite de listas.
-  Plan por bloques acordado: B1 diseño de API contra los casos reales (pedir al owner el
-  `List.lua`/caso de Coffer) → spec en API-v0 → B2 tests con OK del owner → B3
-  implementación (reconciliación pura en `core/`, pooling de frames en `ui/`) → B4
-  verificación in-game (lista dinámica + ForceTaint + EN combate: el pool recicla, jamás
-  crea) → B5 release `v0.2.0` (bump MINOR semver y LibStub). Los docs para devs nuevos
-  (tutorial + README) pasan a **M7**; tras M7, evaluar subir el proceso a nivel L
-  (pre-publicación) y el idioma de commits.
+- **M6 COMPLETO + RELEASE v0.2.0** (2026-07-05, ADR-0007): `Weave.each` adelantado de
+  v1 por demanda real (Coffer en diseño + Craft: options literal-only, DragList sin
+  migrar). Entregado: `core/Reconcile.lua` (reconciliador puro por keys: el frame viaja
+  con la key, las filas liberadas se reciclan antes de crear) + `ui/Each.lua` (render
+  UNA vez por fila, datos por señales item/index, keying `opts.key` con degradación de
+  key secreta a índice, pila vertical/`layout=false`, combate solo-recicla + catch-up
+  en PLAYER_REGEN_ENABLED, `opts.warm`). 180 tests, demo `/weavelist` VERIFICADA
+  IN-GAME (pooling, keying con marca que viaja, secrets "??", overflow en combate).
+  CRAFT-INTEGRATION §4.5 (patrón para options/DragList). Diseño validado con scouts:
+  notas de Craft + patrón List.lua de Sorted + Fusion ForValues como referencia.
+- **Siguiente: M7 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
+  (<60 líneas, 3 pisos — ahora puede mencionar listas con each) + README del repo.
+  Tras M7, evaluar subir el proceso a nivel L (pre-publicación) y el idioma de commits.
+  Avisar a Coffer/Craft: v0.2.0 lista para vendorear (build con scripts/build-embed.ps1).
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 

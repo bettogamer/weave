@@ -131,6 +131,38 @@ MySlider:Init({ value = db.volume }) -- moves live AND survives logout
 
 Nothing extra to implement in the component.
 
+### 4.5 Reactive collections: `Weave.each` (v0.2+)
+
+Until v0.1 the `options`/`items` list of a component had to stay literal-only
+(rebuild-all on `SetOptions`). `Weave.each` removes that limit: give it a signal
+holding an array plus a **row recipe**, and it creates one frame per element,
+**recycling** frames when the list changes — never destroying, and never creating
+in combat (if the pool runs out mid-fight it shows what it can, warns once, and
+catches up on leaving combat).
+
+```lua
+-- e.g. a Select's option list: options is now signal-or-literal like any prop
+W.each(optionsSource, function(item, index)
+  -- runs ONCE per pooled row; item/index are read-only signals
+  return W.new("Button", {
+    size = { 160, 20 },
+    text = W.computed(function() return item() and item().label or "" end),
+    [W.on] = { OnMouseDown = function() self:_selectIndex(index()) end },
+  })
+end, {
+  key    = function(opt) return opt.value end, -- stable identity across reorders
+  parent = self.dropdown,                      -- or place it inside [W.children]
+  warm   = 8,                                  -- pre-bake rows for in-combat growth
+})
+```
+
+- Rows stack vertically by default (`spacing` opt); pass `layout = false` when the
+  component positions rows itself (drag lists, grids).
+- `key` is what preserves per-row state (highlight, focus) when the list reorders —
+  without it, identity is positional.
+- The visible rows are listed on the container as `container._eachRows` (list
+  order), handy for hit-testing and debugging.
+
 ## 5. Taint rules (WoW 12.0+ secret values)
 
 Weave is taint-aware end to end; components inherit that if they follow two rules:
