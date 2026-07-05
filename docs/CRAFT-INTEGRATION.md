@@ -51,23 +51,22 @@ so they can be disposed together — that last one is the component lifecycle to
 
 ### 4.1 Accept a signal OR a literal for any prop
 
-The one helper every component needs (this is exactly how `Weave.new` decides):
+The one helper every component needs (this is exactly how `Weave.new` decides).
+Ask Weave whether a value is reactive — do NOT re-implement the check by poking at
+a signal's metatable, or you couple Craft to Weave's internal shape:
 
 ```lua
-local function isCallable(v)
-  if type(v) == "function" then return true end
-  local mt = getmetatable(v)
-  return type(mt) == "table" and mt.__call ~= nil
-end
-
 -- Applies `v` through applyFn once (literal) or reactively forever (signal).
 local function applyOrBind(self, v, applyFn)
-  if isCallable(v) then
+  if Weave.isReactive(v) then -- signal, computed or function → bind
     return Weave.effect(function() applyFn(self, v()) end)
   end
-  applyFn(self, v)
+  applyFn(self, v)            -- scalar/table → apply once
 end
 ```
+
+`applyOrBind` and `disposeAll` stay in Craft (component contract + `Destroy()`
+lifecycle); only the reactivity predicates come from Weave.
 
 Usage in a component constructor:
 
@@ -111,8 +110,8 @@ drops same-value writes:
 -- signal → widget (display)
 applyOrBind(self, props.value, function(self, v) self.slider:SetValue(v) end)
 
--- widget → signal (input); only when the prop actually IS a signal
-if isCallable(props.value) and props.value.set then
+-- widget → signal (input); only when the prop actually IS a writable signal
+if Weave.isWritable(props.value) then
   self.slider:SetScript("OnValueChanged", function(_, v)
     props.value:set(v) -- equality cut: no feedback loop
   end)
@@ -187,7 +186,7 @@ applyOrBind(self, props.text, function(self, t) self.fs:SetText(t) end)
 
 -- Checkbox: two-way checked
 applyOrBind(self, props.checked, function(self, on) self.button:SetChecked(on) end)
-if isCallable(props.checked) and props.checked.set then
+if Weave.isWritable(props.checked) then
   self.button:SetScript("OnClick", function(btn)
     props.checked:set(btn:GetChecked())
   end)

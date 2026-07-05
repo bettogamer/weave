@@ -346,6 +346,25 @@ function Weave.signal(initial, opts)
 end
 
 ------------------------------------------------------------------------------
+-- Reactive predicates (public — for consumers that accept "signal-or-literal")
+-- Structural, not identity-based: a consumer must NOT couple to the internal
+-- shape of a signal/computed. isReactive == "what effect can observe": a plain
+-- function, or any table made callable via __call (signals/computeds included).
+-- ONE definition shared with the wow/ layer (Props._isCallable delegates here).
+------------------------------------------------------------------------------
+function Weave.isReactive(v)
+  if type(v) == "function" then return true end
+  local mt = getmetatable(v)
+  return type(mt) == "table" and mt.__call ~= nil
+end
+
+-- Writable ⊆ reactive: only a signal (a reactive table exposing a set method).
+-- Computeds are read-only; plain functions have no set → both false.
+function Weave.isWritable(v)
+  return Weave.isReactive(v) and type(v) == "table" and type(v.set) == "function"
+end
+
+------------------------------------------------------------------------------
 -- Batch
 ------------------------------------------------------------------------------
 function Weave.batch(fn)

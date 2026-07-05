@@ -12,6 +12,24 @@
 - **v2 — DevTools `/weave`**: inspector in-game del grafo de señales (hecho con Craft).
 - **v2 — utilidades de tiempo**: `throttle`/`debounce`/`delay` sobre el ticker compartido.
 
+## Solicitado desde el uso real (FR de consumidores)
+
+- _(ninguno abierto)_
+
+## Cerrados
+
+- **Predicados públicos de introspección de reactivos** — ✅ **CERRADO 2026-07-05**
+  (pedido por Craft, ADR-0013 oleada 3). Entregado en el core: `Weave.isReactive(v)` (función
+  o tabla callable → lo que `effect` observa; escalares/tablas planas → `false`) y
+  `Weave.isWritable(v)` (subconjunto: solo signal con `:set`; computed y función → `false`).
+  Semántica **estructural** (no por identidad de metatabla) → un consumidor no se acopla a la
+  forma interna del signal. `Weave.props._isCallable` ahora **delega** en `Weave.isReactive`
+  (una sola definición en todo el repo). Docs: API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6
+  actualizadas para usar los predicados. 12 tests nuevos (`tests/core/predicates_spec.lua`),
+  suite 192 verde, sin ADR (aditivo y menor). **Pendiente del owner**: re-vendorear el build
+  etiquetado en Craft y cambiar `Craft.Reactive.isCallable` / `isWritableSignal` para delegar
+  (`applyOrBind` / `disposeAll` se quedan en Craft — ADR-0013).
+
 ## Ideas futuras (sin compromiso)
 
 - **Craft reactivo por dentro (idea del owner, 2026-07-02)**: el sistema de temas de Craft
