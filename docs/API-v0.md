@@ -175,7 +175,7 @@ local bar = Weave.new("StatusBar", {
 - **Restricción de combate (dura):** `Weave.new` con `InCombatLockdown()` → error claro
   (v0: siempre; el modo no-op con warning para producción queda pendiente de un flag de
   build). La creación declarativa es para construcción de UI fuera de combate; EN combate
-  solo mutan los binds. (Listas dinámicas en combate → `each` con pooling, v1.)
+  solo mutan los binds. (Listas dinámicas en combate → `each` con pooling, M6/ADR-0007.)
 - Elementos creados dentro de un `scope:run()` quedan adscritos al scope (sus binds se
   liberan con él; el frame se oculta y queda reutilizable).
 
@@ -266,9 +266,11 @@ W.new("StatusBar", {
 Criterio de éxito: ~20 líneas, cero handlers manuales, el ancho persiste entre sesiones, y
 bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 
-## 8. Fuera de alcance v0 (explícito — ADR-0005)
+## 8. Fuera de alcance v0.1 (explícito — ADR-0005, reordenado por ADR-0007)
 
-- **v1:** `Weave.each` — listas reactivas con frame pooling combat-safe (W2).
+- **M6 / v0.2.0 (adelantado por ADR-0007):** `Weave.each` — listas reactivas con frame
+  pooling combat-safe (W2). Spec pendiente de diseño (se añadirá aquí como §nueva antes
+  de los tests).
 - **v2:** DevTools in-game `/weave` (W4) · `throttle`/`debounce`/`delay` (W5).
 - **Nunca** (north-star): async/promesas, red/comm, ciclo de vida de addon, slash commands.
 
@@ -282,4 +284,5 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 | M3 | `store/` (persistencia + migraciones) | busted con SV simuladas + prueba in-game de persistencia |
 | M4 | `ui/` (`W.new`, children, scripts, scopes) | demo canónica §7 completa in-game |
 | M5 | paquete embebible + guía de integración Craft + release v0.1 (ADR-0006; absorbe el viejo M6) | el owner actualiza su primer componente Craft solo con la guía; página demo en Craft_Browser (en el repo de Craft) |
-| M6 | docs para devs nuevos | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |
+| M6 | `Weave.each` (W2, adelantado por ADR-0007) + release v0.2.0 | suite headless + demo in-game con lista dinámica + ForceTaint + prueba EN combate (el pool recicla, jamás crea) |
+| M7 | docs para devs nuevos | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |

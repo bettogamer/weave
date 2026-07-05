@@ -31,9 +31,15 @@
   (LibStub MINOR 2). El trabajo de integración en los componentes es del owner, EN el
   repo de Craft, sobre el build etiquetado — validación del ADR: que lo logre solo
   con la guía (si algo no encaja con la API real de Craft, ajustar la guía aquí).
-- **Siguiente: M6 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
-  (<60 líneas, 3 pisos) + README del repo. Tras M6, evaluar subir el proceso a
-  nivel L (pre-publicación) y el idioma de commits.
+- **Siguiente: M6 — `Weave.each`** (ADR-0007, 2026-07-05): adelantado de v1 porque dos
+  consumidores reales (Coffer y la integración Craft) chocaron con el límite de listas.
+  Plan por bloques acordado: B1 diseño de API contra los casos reales (pedir al owner el
+  `List.lua`/caso de Coffer) → spec en API-v0 → B2 tests con OK del owner → B3
+  implementación (reconciliación pura en `core/`, pooling de frames en `ui/`) → B4
+  verificación in-game (lista dinámica + ForceTaint + EN combate: el pool recicla, jamás
+  crea) → B5 release `v0.2.0` (bump MINOR semver y LibStub). Los docs para devs nuevos
+  (tutorial + README) pasan a **M7**; tras M7, evaluar subir el proceso a nivel L
+  (pre-publicación) y el idioma de commits.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
