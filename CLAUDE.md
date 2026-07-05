@@ -41,10 +41,18 @@
   IN-GAME (pooling, keying con marca que viaja, secrets "??", overflow en combate).
   CRAFT-INTEGRATION §4.5 (patrón para options/DragList). Diseño validado con scouts:
   notas de Craft + patrón List.lua de Sorted + Fusion ForValues como referencia.
+- **FR Craft + RELEASE v0.3.0** (2026-07-05, sin ADR — aditivo): predicados públicos
+  `Weave.isReactive(v)` / `Weave.isWritable(v)` (core) para consumidores que aceptan
+  "señal-o-literal", pedidos por Craft (ADR-0013 oleada 3). Semántica estructural (no por
+  identidad de metatabla); `Weave.props._isCallable` delega en `Weave.isReactive` (una
+  sola definición). Docs: API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6. 12 tests nuevos
+  (`tests/core/predicates_spec.lua`), suite 192 verde, luacheck limpio, taintlint 0/0/0.
+  Tag `v0.3.0` sobre main (LibStub MINOR 4). FR cerrado en BACKLOG.
 - **Siguiente: M7 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
   (<60 líneas, 3 pisos — ahora puede mencionar listas con each) + README del repo.
   Tras M7, evaluar subir el proceso a nivel L (pre-publicación) y el idioma de commits.
-  Avisar a Coffer/Craft: v0.2.0 lista para vendorear (build con scripts/build-embed.ps1).
+  Avisar a Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1);
+  al re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
