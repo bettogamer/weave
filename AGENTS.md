@@ -11,9 +11,12 @@
 > limpio. **M5 COMPLETO (ADR-0006)**: paquete embebible (`scripts/build-embed.ps1`
 > con gates), guía de integración (`docs/CRAFT-INTEGRATION.md`, inglés) y
 > **release v0.1.0** (tag sobre main, LibStub MINOR 2). La integración en los
-> componentes es trabajo del owner EN el repo de Craft, sobre este build etiquetado.
-> Siguiente entregable: **M6 — docs para devs nuevos** (tutorial "tu primer addon
-> reactivo", <60 líneas, 3 pisos).
+> componentes es trabajo del owner EN el repo de Craft, sobre builds etiquetados.
+> **M6 COMPLETO + RELEASE v0.2.0**: `Weave.each` (ADR-0007, adelantado de v1 por
+> demanda real de Coffer y Craft) — reconciliador puro por keys en `core/Reconcile.lua`
+> + pooling combat-safe en `ui/Each.lua`; 180 tests; verificado in-game (lista
+> dinámica, secrets, combate con overflow y catch-up). Siguiente entregable:
+> **M7 — docs para devs nuevos** (tutorial "tu primer addon reactivo", <60 líneas).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -31,8 +34,9 @@
 
 1. Este archivo completo.
 2. `docs/NORTH-STAR.md` — el norte innegociable (señales/no-VDOM, cero toolchain, no monolito).
-3. `docs/adr/` — 0001–0006, decisiones fundacionales (0005 = alcance ui+store;
-   0006 = Craft integra Weave nativamente, sin capa `craft/` en Weave).
+3. `docs/adr/` — 0001–0007, decisiones fundacionales (0005 = alcance ui+store;
+   0006 = Craft integra Weave nativamente, sin capa `craft/` en Weave;
+   0007 = `each` adelantado a M6, docs a M7).
 4. `docs/API-v0.md` — la superficie pública; los tests se escriben contra ella.
 5. La regla global de taint de `~/.claude/CLAUDE.md` y AddonTemplate/docs/05 aplican.
 6. Referencia externa de diseño: Fusion (https://github.com/dphfox/Fusion) — precedente de
@@ -135,3 +139,5 @@
 | v0.7 | 2026-07-03 | **M4 completo**: `ui/` entero (153 tests) + demo canónica §7 in-game en forma declarativa final. Descriptors perezosos para regiones (no pueden nacer sin padre); combate = error duro (no-op prod pendiente de flag); `_attachToScope` en el core. |
 | v0.8 | 2026-07-03 | **ADR-0006 (decisión del owner)**: Craft integrará Weave nativamente; la capa `craft/` se elimina del alcance de Weave. M5 redefinido: paquete embebible + guía de integración + release v0.1 (absorbe el viejo M6 de release). |
 | v0.9 | 2026-07-03 | **M5 completo + RELEASE v0.1.0**: build-embed.ps1 (gates: suite+luacheck), CRAFT-INTEGRATION.md, bump LibStub MINOR 2, tag `v0.1.0` sobre main. Weave lista para embeberse en Craft. |
+| v0.10 | 2026-07-05 | **ADR-0007 (decisión del owner)**: `Weave.each` se adelanta de v1 a **M6** (demanda real: Coffer y Craft chocaron con el límite); docs para devs nuevos → M7. `each` cerrará con release v0.2.0. |
+| v0.11 | 2026-07-05 | **M6 completo + RELEASE v0.2.0**: `Weave.each` (core/Reconcile.lua puro + ui/Each.lua; render 1 vez por fila, datos por señales item/index, keying opcional, layout de pila, combate solo-recicla con catch-up en PLAYER_REGEN_ENABLED, opts.warm). 180 tests; demo `/weavelist` verificada in-game. CRAFT-INTEGRATION §4.5; bump LibStub MINOR 3; tag `v0.2.0` sobre main. |

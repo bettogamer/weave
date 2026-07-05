@@ -31,9 +31,20 @@
   (LibStub MINOR 2). El trabajo de integración en los componentes es del owner, EN el
   repo de Craft, sobre el build etiquetado — validación del ADR: que lo logre solo
   con la guía (si algo no encaja con la API real de Craft, ajustar la guía aquí).
-- **Siguiente: M6 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
-  (<60 líneas, 3 pisos) + README del repo. Tras M6, evaluar subir el proceso a
-  nivel L (pre-publicación) y el idioma de commits.
+- **M6 COMPLETO + RELEASE v0.2.0** (2026-07-05, ADR-0007): `Weave.each` adelantado de
+  v1 por demanda real (Coffer en diseño + Craft: options literal-only, DragList sin
+  migrar). Entregado: `core/Reconcile.lua` (reconciliador puro por keys: el frame viaja
+  con la key, las filas liberadas se reciclan antes de crear) + `ui/Each.lua` (render
+  UNA vez por fila, datos por señales item/index, keying `opts.key` con degradación de
+  key secreta a índice, pila vertical/`layout=false`, combate solo-recicla + catch-up
+  en PLAYER_REGEN_ENABLED, `opts.warm`). 180 tests, demo `/weavelist` VERIFICADA
+  IN-GAME (pooling, keying con marca que viaja, secrets "??", overflow en combate).
+  CRAFT-INTEGRATION §4.5 (patrón para options/DragList). Diseño validado con scouts:
+  notas de Craft + patrón List.lua de Sorted + Fusion ForValues como referencia.
+- **Siguiente: M7 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
+  (<60 líneas, 3 pisos — ahora puede mencionar listas con each) + README del repo.
+  Tras M7, evaluar subir el proceso a nivel L (pre-publicación) y el idioma de commits.
+  Avisar a Coffer/Craft: v0.2.0 lista para vendorear (build con scripts/build-embed.ps1).
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
@@ -53,10 +64,11 @@
 ## Comandos reales de esta máquina
 
 ```bash
-lua tests/run.lua tests/core/signal_spec.lua tests/core/computed_spec.lua tests/core/scope_spec.lua tests/core/taint_spec.lua
-# ↑ suite completa (mini-runner propio: busted NO instala aquí — falta compilador C; busted queda para CI Linux)
+lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.lua tests/ui/*_spec.lua
+# ↑ suite completa, 180 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
+#   queda para CI Linux). Los globs los expande la shell (Bash); en PowerShell enumerar los archivos.
 
-luacheck Weave/Weave.lua Weave/core/Core.lua --config .luacheckrc
+luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
 # ↑ luacheck 1.2.0 instalado, pero NO puede escanear carpetas en esta máquina (sin lfs): pasar archivos explícitos
 
 luac -p <archivo>   # el lua local es 5.4: sirve para sintaxis, pero el target es 5.1 (luacheck std lua51 vigila)
@@ -68,6 +80,14 @@ node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js demo/WeaveDemo/W
 
 powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo a F:\Games\...\AddOns → /reload
 ```
+
+## Subagentes del proyecto (`.claude/agents/`)
+
+- **addon-scout** (Sonnet, read-only) — localizar código/patrones, investigar API WoW 12.0.7.
+- **error-triager** (Sonnet, read-only) — diagnosticar errores Lua de BugSack (sabe que un
+  popup de secret = guard que falta, y que API de WoW en core/ es bug de frontera).
+- Política de modelos: lectura/diagnóstico → Sonnet; escritura sensible → agente principal
+  (AddonTemplate/docs/04). Copiados del estándar 2026-07-03 (retro de M5).
 
 ## Git — reglas para Claude Code en este repo
 
