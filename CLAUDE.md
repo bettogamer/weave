@@ -69,6 +69,14 @@ node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js demo/WeaveDemo/W
 powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo a F:\Games\...\AddOns → /reload
 ```
 
+## Subagentes del proyecto (`.claude/agents/`)
+
+- **addon-scout** (Sonnet, read-only) — localizar código/patrones, investigar API WoW 12.0.7.
+- **error-triager** (Sonnet, read-only) — diagnosticar errores Lua de BugSack (sabe que un
+  popup de secret = guard que falta, y que API de WoW en core/ es bug de frontera).
+- Política de modelos: lectura/diagnóstico → Sonnet; escritura sensible → agente principal
+  (AddonTemplate/docs/04). Copiados del estándar 2026-07-03 (retro de M5).
+
 ## Git — reglas para Claude Code en este repo
 
 - **Identidad local del repo**: `Betto <betto.gamer@icloud.com>` (ya configurada, local).
