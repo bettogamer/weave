@@ -8,3 +8,4 @@
 
 Demo.lua
 TaintTest.lua
+EachDemo.lua
