@@ -64,8 +64,8 @@
   PR. Job `lua`: setup Lua **5.1** (target real; las locales corren 5.4/5.5) + luacheck vía
   luarocks → suite (mini-runner, sale !=0 si falla) + luacheck de lib y demo. Job `taintlint`:
   clona+buildea github.com/bettogamer/taintlint y lo corre sobre los 3 .toc (sale !=0 solo ante
-  `error`; los 2 INFO SV010 pasan). **Aún NO validado en Actions**: solo corre al hacer push
-  (lo hace el owner) — si el setup del runner necesita ajuste, se itera en el primer push.
+  `error`; los 2 INFO SV010 pasan). **Verde en Actions** (validado 2026-07-05 tras el primer
+  push del owner): ambos jobs pasan — suite en Lua 5.1 real, luacheck y taintlint limpios.
 - **Siguiente**: (1) **animaciones** (acordado 2026-07-05, decisión del owner): empezar por
   `tween` (determinista/testeable) con la base preparada para `spring` (owner quiere ambos, pero
   por el camino seguro — evitar sobre-diseño sin consumidor real; backlog §"Ideas futuras");

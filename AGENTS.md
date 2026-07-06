@@ -22,8 +22,13 @@
 > primer addon reactivo — contador de oro, tres pisos, ~15 líneas, sin secrets) + README
 > reescrito a la realidad v0.3.0; el tutorial se materializó como addon ejecutable
 > `demo/MiOro/`. Gates verdes (192 tests, luacheck 0/0, taintlint MiOro 0/0/0); in-game de
-> MiOro pendiente del owner. Siguiente: evaluar subir el proceso a nivel L y el idioma de
-> commits a inglés (post-M7).
+> MiOro pendiente del owner. **CI añadido** (`.github/workflows/ci.yml`, verde en Actions):
+> suite en Lua 5.1 + luacheck + taintlint en push/PR.
+> **M8 EN CURSO — animaciones `Weave.tween`** (ADR-0008, tween-first, release v0.4.0): reactivo
+> read-only que se desliza hacia el valor de una señal (número o array/color), con `t:animating()`
+> para coordinar entrada/salida. **Consumidor real: Craft** (select/modal/collapse). Motor puro
+> `core/Tween.lua` (headless) + driver `wow/Anim.lua` (ticker compartido). Spec en API-v0 §2;
+> diseño aprobado, TDD en marcha.
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
