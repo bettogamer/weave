@@ -3,6 +3,7 @@
 	<Script file="Weave.lua"/>
 	<Script file="core\Core.lua"/>
 	<Script file="core\Reconcile.lua"/>
+	<Script file="core\Tween.lua"/>
 	<Script file="wow\Events.lua"/>
 	<Script file="wow\Props.lua"/>
 	<Script file="wow\Ticker.lua"/>
