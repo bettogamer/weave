@@ -7,6 +7,7 @@
 	<Script file="wow\Events.lua"/>
 	<Script file="wow\Props.lua"/>
 	<Script file="wow\Ticker.lua"/>
+	<Script file="wow\Anim.lua"/>
 	<Script file="store\Store.lua"/>
 	<Script file="ui\Ui.lua"/>
 	<Script file="ui\Each.lua"/>

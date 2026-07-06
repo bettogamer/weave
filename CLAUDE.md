@@ -102,7 +102,7 @@ lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.
 # ↑ suite completa, 192 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
 #   queda para CI Linux). El lua local es 5.5; el target es 5.1 (luacheck std lua51 vigila).
 
-luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
+luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/core/Tween.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/wow/Anim.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
 # ↑ luacheck 1.2.0 (brew install luacheck). NO escanea carpetas (sin lfs): pasar archivos explícitos.
 #   Los .lua de demo/ (MiOro, WeaveDemo) se lintean aparte cuando cambian.
 
