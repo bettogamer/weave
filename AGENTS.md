@@ -18,8 +18,12 @@
 > dinámica, secrets, combate con overflow y catch-up). **FR Craft + RELEASE v0.3.0**
 > (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core)
 > para consumidores "señal-o-literal"; `props._isCallable` delega en ellos; 192 tests.
-> Siguiente entregable: **M7 — docs para devs nuevos** (tutorial "tu primer addon
-> reactivo", <60 líneas).
+> **M7 COMPLETO — docs para devs nuevos** (sin ADR, solo docs): `docs/TUTORIAL.md` (tu
+> primer addon reactivo — contador de oro, tres pisos, ~15 líneas, sin secrets) + README
+> reescrito a la realidad v0.3.0; el tutorial se materializó como addon ejecutable
+> `demo/MiOro/`. Gates verdes (192 tests, luacheck 0/0, taintlint MiOro 0/0/0); in-game de
+> MiOro pendiente del owner. Siguiente: evaluar subir el proceso a nivel L y el idioma de
+> commits a inglés (post-M7).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto

@@ -48,11 +48,22 @@
   sola definición). Docs: API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6. 12 tests nuevos
   (`tests/core/predicates_spec.lua`), suite 192 verde, luacheck limpio, taintlint 0/0/0.
   Tag `v0.3.0` sobre main (LibStub MINOR 4). FR cerrado en BACKLOG.
-- **Siguiente: M7 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
-  (<60 líneas, 3 pisos — ahora puede mencionar listas con each) + README del repo.
-  Tras M7, evaluar subir el proceso a nivel L (pre-publicación) y el idioma de commits.
-  Avisar a Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1);
-  al re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
+- **M7 COMPLETO — docs para devs nuevos** (2026-07-05, sin ADR — solo docs): entregados
+  `docs/TUTORIAL.md` ("tu primer addon reactivo": contador de oro, tres pisos estado→
+  derivación→vista con analogía de Excel, ~15 líneas, gentil — sin secret values) y
+  **README** reescrito a la realidad v0.3.0 (estado IMPLEMENTADO, quickstart real, tabla de
+  capas, enlaces a tutorial/API/demos, ADRs 0001–0007). El tutorial se materializó como addon
+  ejecutable `demo/MiOro/` (comentarios in-code en inglés; la versión en español vive en el
+  doc) y se añadió a `deploy-local.ps1`. Gates en verde: suite **192**, luacheck 0/0 (`.luacheckrc`
+  ganó `GetMoney`/`GetCoinTextureString`), taintlint MiOro **0/0/0** — la db 12.0.7 NO marca
+  `GetMoney` como secret (a diferencia de `UnitHealth`): evidencia de que el ejemplo es correcto.
+  **PENDIENTE (owner)**: verificación in-game de `/MiOro` con deploy+/reload (debe verse el oro
+  con iconos de moneda; si saliera "??", el oro sería secret y habría que replantear el ejemplo).
+  Toolchain de gates instalada en macOS este día (luacheck vía brew, taintlint clonado+buildeado).
+- **Siguiente**: (1) evaluar **subir el proceso a nivel L** (pre-publicación) y **el idioma de
+  commits** a inglés (como taintlint); (2) considerar CI Linux con busted. Avisar a Coffer/Craft:
+  **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al re-vendorear, que
+  `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados públicos.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
@@ -71,22 +82,30 @@
 
 ## Comandos reales de esta máquina
 
+> Dos máquinas en juego. **macOS (este repo, `/Users/beto/Workspace/...`)**: toolchain de
+> gates completo (suite + luacheck + taintlint) — instalado 2026-07-05. **Windows
+> (`c:/Users/Usuario/...`)**: donde corre WoW → deploy + prueba in-game (`deploy-local.ps1`
+> es PowerShell y apunta a `F:\Games\...`). Los globs los expande Bash; en PowerShell enumerar.
+
 ```bash
+# --- macOS (gates locales) ---
 lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.lua tests/ui/*_spec.lua
-# ↑ suite completa, 180 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
-#   queda para CI Linux). Los globs los expande la shell (Bash); en PowerShell enumerar los archivos.
+# ↑ suite completa, 192 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
+#   queda para CI Linux). El lua local es 5.5; el target es 5.1 (luacheck std lua51 vigila).
 
 luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
-# ↑ luacheck 1.2.0 instalado, pero NO puede escanear carpetas en esta máquina (sin lfs): pasar archivos explícitos
+# ↑ luacheck 1.2.0 (brew install luacheck). NO escanea carpetas (sin lfs): pasar archivos explícitos.
+#   Los .lua de demo/ (MiOro, WeaveDemo) se lintean aparte cuando cambian.
 
-luac -p <archivo>   # el lua local es 5.4: sirve para sintaxis, pero el target es 5.1 (luacheck std lua51 vigila)
+node /Users/beto/Workspace/taintlint/dist/cli.js Weave/Weave.toc
+node /Users/beto/Workspace/taintlint/dist/cli.js demo/WeaveDemo/WeaveDemo.toc
+node /Users/beto/Workspace/taintlint/dist/cli.js demo/MiOro/MiOro.toc
+# ↑ taintlint 0.2.0 clonado de github.com/bettogamer/taintlint a ~/Workspace/taintlint y buildeado
+#   (npm install && npm run build → dist/cli.js). Pasa por .toc, no por carpeta. En Windows la ruta
+#   es c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js.
 
-node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js Weave/Weave.toc
-node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js demo/WeaveDemo/WeaveDemo.toc
-# ↑ taintlint local (Node 24 LTS instalado 2026-07-03 vía winget; en shells abiertas antes de esa
-#   fecha usar la ruta completa "C:\Program Files\nodejs\node.exe"). Pasa por .toc, no por carpeta.
-
-powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo a F:\Games\...\AddOns → /reload
+# --- Windows (deploy + in-game) ---
+powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo + MiOro a F:\Games\...\AddOns → /reload
 ```
 
 ## Subagentes del proyecto (`.claude/agents/`)

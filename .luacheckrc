@@ -12,6 +12,7 @@ globals = {
     "LibStub",
     -- APIs del juego usadas por la demo (demo/):
     "UnitHealth", "UnitHealthMax",
+    "GetMoney", "GetCoinTextureString",
     "SLASH_WEAVETAINT1", "SLASH_WEAVEWIDTH1", "SLASH_WEAVELIST1", "SlashCmdList",
 }
 
