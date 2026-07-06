@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  lua:
+    name: tests + luacheck (Lua 5.1)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lua 5.1 = el target real del sandbox de WoW (las máquinas locales corren 5.4/5.5;
+      # CI es el único sitio donde la suite se ejecuta sobre la versión de destino).
+      - uses: leafo/gh-actions-lua@v10
+        with:
+          luaVersion: "5.1"
+      - uses: leafo/gh-actions-luarocks@v4
+      - name: Install luacheck
+        run: luarocks install luacheck
+
+      - name: Test suite (mini-runner; sale != 0 si algo falla)
+        run: lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.lua tests/ui/*_spec.lua
+
+      - name: luacheck — library
+        run: luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
+
+      - name: luacheck — demo
+        run: luacheck demo/WeaveDemo/Demo.lua demo/WeaveDemo/EachDemo.lua demo/WeaveDemo/TaintTest.lua demo/MiOro/MiOro.lua --config .luacheckrc
+
+  taintlint:
+    name: taintlint (.toc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # taintlint es la herramienta hermana (repo del owner). Se clona y construye;
+      # sale != 0 solo ante findings de severidad `error` (los INFO SV010 de la demo pasan).
+      - name: Build taintlint
+        run: |
+          git clone --depth 1 https://github.com/bettogamer/taintlint.git "$RUNNER_TEMP/taintlint"
+          cd "$RUNNER_TEMP/taintlint"
+          npm ci
+          npm run build
+
+      - name: taintlint — Weave
+        run: node "$RUNNER_TEMP/taintlint/dist/cli.js" Weave/Weave.toc
+      - name: taintlint — WeaveDemo
+        run: node "$RUNNER_TEMP/taintlint/dist/cli.js" demo/WeaveDemo/WeaveDemo.toc
+      - name: taintlint — MiOro
+        run: node "$RUNNER_TEMP/taintlint/dist/cli.js" demo/MiOro/MiOro.toc

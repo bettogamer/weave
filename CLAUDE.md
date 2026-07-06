@@ -60,10 +60,19 @@
   **PENDIENTE (owner)**: verificación in-game de `/MiOro` con deploy+/reload (debe verse el oro
   con iconos de moneda; si saliera "??", el oro sería secret y habría que replantear el ejemplo).
   Toolchain de gates instalada en macOS este día (luacheck vía brew, taintlint clonado+buildeado).
-- **Siguiente**: (1) evaluar **subir el proceso a nivel L** (pre-publicación) y **el idioma de
-  commits** a inglés (como taintlint); (2) considerar CI Linux con busted. Avisar a Coffer/Craft:
-  **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al re-vendorear, que
-  `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados públicos.
+- **CI AÑADIDO** (2026-07-05): `.github/workflows/ci.yml` — dos jobs en push a main/dev y en
+  PR. Job `lua`: setup Lua **5.1** (target real; las locales corren 5.4/5.5) + luacheck vía
+  luarocks → suite (mini-runner, sale !=0 si falla) + luacheck de lib y demo. Job `taintlint`:
+  clona+buildea github.com/bettogamer/taintlint y lo corre sobre los 3 .toc (sale !=0 solo ante
+  `error`; los 2 INFO SV010 pasan). **Aún NO validado en Actions**: solo corre al hacer push
+  (lo hace el owner) — si el setup del runner necesita ajuste, se itera en el primer push.
+- **Siguiente**: (1) **animaciones** (acordado 2026-07-05, decisión del owner): empezar por
+  `tween` (determinista/testeable) con la base preparada para `spring` (owner quiere ambos, pero
+  por el camino seguro — evitar sobre-diseño sin consumidor real; backlog §"Ideas futuras");
+  probablemente ADR (adelanta v3+, como each con ADR-0007). (2) evaluar **nivel L** y **idioma de
+  commits** a inglés. Avisar a Coffer/Craft: **v0.3.0 lista para vendorear** (build con
+  scripts/build-embed.ps1); al re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal`
+  deleguen en los predicados públicos.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
