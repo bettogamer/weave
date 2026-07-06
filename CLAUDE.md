@@ -66,13 +66,27 @@
   clona+buildea github.com/bettogamer/taintlint y lo corre sobre los 3 .toc (sale !=0 solo ante
   `error`; los 2 INFO SV010 pasan). **Verde en Actions** (validado 2026-07-05 tras el primer
   push del owner): ambos jobs pasan — suite en Lua 5.1 real, luacheck y taintlint limpios.
-- **Siguiente**: (1) **animaciones** (acordado 2026-07-05, decisión del owner): empezar por
-  `tween` (determinista/testeable) con la base preparada para `spring` (owner quiere ambos, pero
-  por el camino seguro — evitar sobre-diseño sin consumidor real; backlog §"Ideas futuras");
-  probablemente ADR (adelanta v3+, como each con ADR-0007). (2) evaluar **nivel L** y **idioma de
-  commits** a inglés. Avisar a Coffer/Craft: **v0.3.0 lista para vendorear** (build con
-  scripts/build-embed.ps1); al re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal`
-  deleguen en los predicados públicos.
+- **M8 EN CURSO — animaciones `Weave.tween`** (ADR-0008, tween-first, release v0.4.0 pendiente).
+  **Consumidor real: Craft** (select/modal/collapse — el owner quiere animarlos sobre Weave).
+  Hecho y VERDE headless (218 tests, luacheck 0/0, taintlint 0/0/0):
+  - **Bloque 1** (`57b6c65`): `core/Tween.lua` — motor puro `Weave._tweenEngine(from,to,duration,
+    easing)` con `anim:at(elapsed)→value,done`; número o array (lerp por elemento, tabla-resultado
+    reutilizada = cero allocations/frame). `Weave.easing` = linear/inQuad/outQuad/inOutQuad. 13 tests.
+  - **Bloque 2** (`acb8fe3`): `wow/Anim.lua` — `Weave.tween(target,opts)` reactivo read-only.
+    Driver único compartido (un frame OnUpdate, se oculta al vaciarse → coste cero en reposo).
+    Siembra en el valor actual, re-targeting desde el valor actual, `t:animating()` reactivo
+    (coordina entrada/salida: `shown = abierto or t:animating()`), degradación por secret,
+    disposal por scope. Solo muta → combat-safe. Default easing `outQuad`. 13 tests.
+- **Siguiente (arrancar M8 bloque 3)**: **demo in-game** — es la validación que pide el ADR-0008
+  (la demo hace de primer validador antes de que Craft migre). Propuesto: panel toggled por slash
+  command con fundido+expansión al abrir y fundido de salida que se oculta al terminar (patrón
+  collapse/modal, `shown = abierto or animating`). Alternativa más simple: barra cuyo value/color
+  se desliza. Tras la demo (verificada in-game por el owner): **doc CRAFT-INTEGRATION** (patrón
+  tween, como §4.5 de each) y **release v0.4.0** (bump .toc + LibStub MINOR 5, tag sobre main).
+- **Pendientes de fondo** (post-M8): (1) verificación in-game de `/MiOro` (M7) — deploy+/reload,
+  ver el oro con iconos. (2) evaluar **nivel L** y **idioma de commits** a inglés. (3) avisar a
+  Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al
+  re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
