@@ -136,6 +136,52 @@ Señal de tiempo throttleada (un único frame ticker compartido) para countdowns
 nace sembrada con la hora actual. Solo tickea si tiene suscriptores vivos, y **el mismo
 intervalo devuelve la misma señal** (se comparte).
 
+### `Weave.tween(target, opts?) → Tween` (M8 — ADR-0008)
+
+Reactivo **read-only** cuyo valor se **desliza** hacia `target()` en el tiempo, en vez de
+saltar. `target` es una señal/computed (o cualquier llamable) que devuelve un **número** o
+un **array de números** (`{r,g,b}`, `{x,y}` — se interpola por elemento); un literal vale y
+se siembra sin animar (coherencia señal-o-literal de `bind`/`Weave.new`). Se bindea como
+cualquier señal.
+
+```lua
+local pct   = Weave.computed(function() return hp() / hpMax() end)
+local suave = Weave.tween(pct, { duration = 0.3, easing = Weave.easing.outQuad })
+
+Weave.new("StatusBar", { value = suave })   -- la barra se desliza, no salta
+
+-- arrays: color que transiciona canal a canal
+local color = Weave.computed(function() return pct() < 0.3 and {1,.2,.2} or {.2,.8,.2} end)
+Weave.new("StatusBar", { statusBarColor = Weave.tween(color, { duration = 0.5 }) })
+```
+
+- **Siembra:** al crearse toma el valor actual de `target()` (arranca AHÍ, sin salto). La
+  primera animación ocurre en el primer cambio de `target`.
+- **Re-targeting:** si `target` cambia a mitad de una animación, la nueva anima **desde el
+  valor actual** (no desde el origen viejo) hacia la meta nueva, reiniciando la duración.
+- `opts.duration` — segundos (default `0.3`). `opts.easing` — función `(t) → t` con `t` en
+  `[0,1]` (default `Weave.easing.outQuad` — se siente natural en UI). `opts.fallback` —
+  valor expuesto si `target` degrada por secret (§3).
+- **Driver compartido:** un único ticker mueve TODAS las animaciones activas por frame; una
+  que llega a su meta se retira (coste cero en reposo; el ticker para si no queda ninguna —
+  misma disciplina que `onUpdate`). Los arrays reutilizan una tabla-resultado por tween
+  (mutada in-place) → cero allocations por frame (contrato §1).
+- **Taint:** si `target()` es secret, no se puede interpolar → degrada por el chokepoint
+  (fallback / se congela) y reanuda al volver un valor normal.
+- **Combate:** un tween solo MUTA (no crea frames) → combat-safe; el driver corre en combate
+  sin tratamiento especial (a diferencia de `each`).
+- **Disposal:** adscrito al scope activo; `dispose()` lo desengancha del target y del driver.
+- **`t:animating()` — booleano reactivo**: true mientras hay una animación en curso, false
+  al llegar a la meta (o al sembrarse). Es una señal más (trackea): sirve para coordinar
+  entrada/salida sin callbacks — un frame que se oculta al terminar su fundido de salida
+  hace `shown = W.computed(function() return abierto() or t:animating() end)`.
+- Read-only: `t()`, `t:peek()`, `t:isSecret()`; `Weave.isReactive(t)` → true,
+  `Weave.isWritable(t)` → false. El motor de interpolación es Lua puro (`core/Tween.lua`,
+  testeable headless); el reloj/driver es wow (`wow/Anim.lua`).
+
+**Easings v0** — `Weave.easing`: `linear`, `inQuad`, `outQuad`, `inOutQuad`. Cualquier
+función propia `(t) → t` vale. `Weave.spring` queda reservado como hermano futuro (ADR-0008).
+
 ### Chokepoint de errores (automático, ADR-0003)
 
 Todo effect (y por tanto todo bind) corre bajo un handler **en el core**: si el error
@@ -337,11 +383,13 @@ W.new("StatusBar", {
 Criterio de éxito: ~20 líneas, cero handlers manuales, el ancho persiste entre sesiones, y
 bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 
-## 8. Fuera de alcance v0.1 (explícito — ADR-0005, reordenado por ADR-0007)
+## 8. Fuera de alcance v0.1 (explícito — ADR-0005, reordenado por ADR-0007/0008)
 
 - **M6 / v0.2.0 (adelantado por ADR-0007):** `Weave.each` — listas reactivas con frame
   pooling combat-safe (W2). Spec en §4 (diseñada contra los casos reales de Coffer y
   Craft, 2026-07-05).
+- **M8 / v0.4.0 (adelantado por ADR-0008):** `Weave.tween` — animaciones tween-first
+  (número/array). Spec en §2. `Weave.spring` reservado como hermano futuro.
 - **v2:** DevTools in-game `/weave` (W4) · `throttle`/`debounce`/`delay` (W5).
 - **Nunca** (north-star): async/promesas, red/comm, ciclo de vida de addon, slash commands.
 
@@ -357,3 +405,4 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 | M5 | paquete embebible + guía de integración Craft + release v0.1 (ADR-0006; absorbe el viejo M6) | el owner actualiza su primer componente Craft solo con la guía; página demo en Craft_Browser (en el repo de Craft) |
 | M6 | `Weave.each` (W2, adelantado por ADR-0007) + release v0.2.0 | suite headless + demo in-game con lista dinámica + ForceTaint + prueba EN combate (el pool recicla, jamás crea) |
 | M7 | docs para devs nuevos | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |
+| M8 | `Weave.tween` (animaciones tween-first, ADR-0008) + release v0.4.0 | suite headless (motor `core/Tween.lua`) + demo in-game deslizando bajo ForceTaint, coste cero en reposo |

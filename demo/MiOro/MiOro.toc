@@ -1,0 +1,8 @@
+## Interface: 120007
+## Title: Mi Oro
+## Notes: Tutorial addon (M7): a reactive on-screen gold counter
+## Author: Alberto Gomez
+## Version: 0.1.0-dev
+## Dependencies: Weave
+
+MiOro.lua

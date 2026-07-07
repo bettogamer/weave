@@ -13,7 +13,8 @@ if (-not (Test-Path $AddOnsPath)) {
 
 foreach ($pair in @(
     @{ src = Join-Path $repo "Weave";           dest = Join-Path $AddOnsPath "Weave" },
-    @{ src = Join-Path $repo "demo\WeaveDemo";  dest = Join-Path $AddOnsPath "WeaveDemo" }
+    @{ src = Join-Path $repo "demo\WeaveDemo";  dest = Join-Path $AddOnsPath "WeaveDemo" },
+    @{ src = Join-Path $repo "demo\MiOro";      dest = Join-Path $AddOnsPath "MiOro" }
 )) {
     if (Test-Path $pair.dest) { Remove-Item -Recurse -Force $pair.dest }
     Copy-Item -Recurse $pair.src $pair.dest

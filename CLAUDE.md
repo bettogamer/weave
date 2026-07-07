@@ -48,11 +48,60 @@
   sola definición). Docs: API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6. 12 tests nuevos
   (`tests/core/predicates_spec.lua`), suite 192 verde, luacheck limpio, taintlint 0/0/0.
   Tag `v0.3.0` sobre main (LibStub MINOR 4). FR cerrado en BACKLOG.
-- **Siguiente: M7 — docs para devs nuevos**: tutorial "tu primer addon reactivo"
-  (<60 líneas, 3 pisos — ahora puede mencionar listas con each) + README del repo.
-  Tras M7, evaluar subir el proceso a nivel L (pre-publicación) y el idioma de commits.
-  Avisar a Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1);
-  al re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
+- **M7 COMPLETO — docs para devs nuevos** (2026-07-05, sin ADR — solo docs): entregados
+  `docs/TUTORIAL.md` ("tu primer addon reactivo": contador de oro, tres pisos estado→
+  derivación→vista con analogía de Excel, ~15 líneas, gentil — sin secret values) y
+  **README** reescrito a la realidad v0.3.0 (estado IMPLEMENTADO, quickstart real, tabla de
+  capas, enlaces a tutorial/API/demos, ADRs 0001–0007). El tutorial se materializó como addon
+  ejecutable `demo/MiOro/` (comentarios in-code en inglés; la versión en español vive en el
+  doc) y se añadió a `deploy-local.ps1`. Gates en verde: suite **192**, luacheck 0/0 (`.luacheckrc`
+  ganó `GetMoney`/`GetCoinTextureString`), taintlint MiOro **0/0/0** — la db 12.0.7 NO marca
+  `GetMoney` como secret (a diferencia de `UnitHealth`): evidencia de que el ejemplo es correcto.
+  **PENDIENTE (owner)**: verificación in-game de `/MiOro` con deploy+/reload (debe verse el oro
+  con iconos de moneda; si saliera "??", el oro sería secret y habría que replantear el ejemplo).
+  Toolchain de gates instalada en macOS este día (luacheck vía brew, taintlint clonado+buildeado).
+- **CI AÑADIDO** (2026-07-05): `.github/workflows/ci.yml` — dos jobs en push a main/dev y en
+  PR. Job `lua`: setup Lua **5.1** (target real; las locales corren 5.4/5.5) + luacheck vía
+  luarocks → suite (mini-runner, sale !=0 si falla) + luacheck de lib y demo. Job `taintlint`:
+  clona+buildea github.com/bettogamer/taintlint y lo corre sobre los 3 .toc (sale !=0 solo ante
+  `error`; los 2 INFO SV010 pasan). **Verde en Actions** (validado 2026-07-05 tras el primer
+  push del owner): ambos jobs pasan — suite en Lua 5.1 real, luacheck y taintlint limpios.
+- **M8 EN CURSO — animaciones `Weave.tween`** (ADR-0008, tween-first, release v0.4.0 pendiente).
+  **Consumidor real: Craft** (select/modal/collapse — el owner quiere animarlos sobre Weave).
+  Hecho y VERDE headless (218 tests, luacheck 0/0, taintlint 0/0/0):
+  - **Bloque 1** (`57b6c65`): `core/Tween.lua` — motor puro `Weave._tweenEngine(from,to,duration,
+    easing)` con `anim:at(elapsed)→value,done`; número o array (lerp por elemento, tabla-resultado
+    reutilizada = cero allocations/frame). `Weave.easing` = linear/inQuad/outQuad/inOutQuad. 13 tests.
+  - **Bloque 2** (`acb8fe3`): `wow/Anim.lua` — `Weave.tween(target,opts)` reactivo read-only.
+    Driver único compartido (un frame OnUpdate, se oculta al vaciarse → coste cero en reposo).
+    Siembra en el valor actual, re-targeting desde el valor actual, `t:animating()` reactivo
+    (coordina entrada/salida: `shown = abierto or t:animating()`), degradación por secret,
+    disposal por scope. Solo muta → combat-safe. Default easing `outQuad`. 13 tests.
+- **M8 bloque 3 HECHO — demo verificada in-game** (2026-07-06): `demo/WeaveDemo/TweenDemo.lua`
+  (`/weavetween`) — panel modal/collapse (fade alpha + expand height, salida que se oculta vía
+  `shown = abierto or alpha:animating()`) + barra que desliza value/color (array tween). Gates
+  verdes (luacheck 0/0, taintlint 0/0). **Hallazgo (quirk de render de WoW, NO bug de Weave)**:
+  animar la ALTURA de un frame a **0 exacto** y volver a crecer no repinta la geometría en el
+  2º+ ciclo (1er ciclo va; síntoma según lo demás: con clipsChildren "no se ve", sin él "no
+  anima el expand"). `Hide/Show` sí funciona; `clipsChildren` era falso culpable. Verificado 3×
+  que Weave entrega valores correctos siempre (headless, repro semántica in-game, y `GetAlpha`/
+  `GetHeight` in-game). **Fix del patrón**: visibilidad total por fade de alpha; geometría
+  colapsa a un mínimo NO-cero (nunca 0). Detalle en AGENTS.md §9.
+- **Fix real en `wow/Anim.lua` (2026-07-06)**: re-entrancy en `onTick` — desregistrar el tween
+  ANTES de disparar `_current:set`/`_animating:set` (que corren effects síncronos); si uno
+  re-apunta el mismo tween en el instante en que termina (ping-pong / auto-reverse), `arm` lo
+  ve inactivo y lo re-engancha limpio en vez de dejarlo animando-pero-congelado. Test de
+  ping-pong en `tests/wow/anim_spec.lua`; 219 tests verde. Encontrado auditando a raíz de
+  "¿falta algo en anim?". (`Weave.spring` sigue reservado por diseño, ADR-0008 — no es un hueco.)
+- **CRAFT-INTEGRATION §4.6 HECHA** (2026-07-06): patrón tween para Craft (modal/collapse con
+  `shown = abierto or t:animating()`, array tween para color) + el caveat del `height→0`.
+- **Siguiente (cerrar M8)**: **release v0.4.0** — bump `.toc` (LibStub MINOR 5), fila en changelog
+  (§10 AGENTS.md), tag `v0.4.0` sobre main. Toca versión + git → commit/tag los hace el owner.
+- **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
+  in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
+  (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
+  Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al
+  re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
 
 ## Cómo se trabaja en este proyecto (acordado con el owner — NO saltárselo)
 
@@ -71,22 +120,30 @@
 
 ## Comandos reales de esta máquina
 
+> Dos máquinas en juego. **macOS (este repo, `/Users/beto/Workspace/...`)**: toolchain de
+> gates completo (suite + luacheck + taintlint) — instalado 2026-07-05. **Windows
+> (`c:/Users/Usuario/...`)**: donde corre WoW → deploy + prueba in-game (`deploy-local.ps1`
+> es PowerShell y apunta a `F:\Games\...`). Los globs los expande Bash; en PowerShell enumerar.
+
 ```bash
+# --- macOS (gates locales) ---
 lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.lua tests/ui/*_spec.lua
-# ↑ suite completa, 180 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
-#   queda para CI Linux). Los globs los expande la shell (Bash); en PowerShell enumerar los archivos.
+# ↑ suite completa, 192 tests (mini-runner propio: busted NO instala aquí — falta compilador C; busted
+#   queda para CI Linux). El lua local es 5.5; el target es 5.1 (luacheck std lua51 vigila).
 
-luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
-# ↑ luacheck 1.2.0 instalado, pero NO puede escanear carpetas en esta máquina (sin lfs): pasar archivos explícitos
+luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/core/Tween.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/wow/Anim.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
+# ↑ luacheck 1.2.0 (brew install luacheck). NO escanea carpetas (sin lfs): pasar archivos explícitos.
+#   Los .lua de demo/ (MiOro, WeaveDemo) se lintean aparte cuando cambian.
 
-luac -p <archivo>   # el lua local es 5.4: sirve para sintaxis, pero el target es 5.1 (luacheck std lua51 vigila)
+node /Users/beto/Workspace/taintlint/dist/cli.js Weave/Weave.toc
+node /Users/beto/Workspace/taintlint/dist/cli.js demo/WeaveDemo/WeaveDemo.toc
+node /Users/beto/Workspace/taintlint/dist/cli.js demo/MiOro/MiOro.toc
+# ↑ taintlint 0.2.0 clonado de github.com/bettogamer/taintlint a ~/Workspace/taintlint y buildeado
+#   (npm install && npm run build → dist/cli.js). Pasa por .toc, no por carpeta. En Windows la ruta
+#   es c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js.
 
-node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js Weave/Weave.toc
-node c:/Users/Usuario/Documents/Workspace/taintlint/dist/cli.js demo/WeaveDemo/WeaveDemo.toc
-# ↑ taintlint local (Node 24 LTS instalado 2026-07-03 vía winget; en shells abiertas antes de esa
-#   fecha usar la ruta completa "C:\Program Files\nodejs\node.exe"). Pasa por .toc, no por carpeta.
-
-powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo a F:\Games\...\AddOns → /reload
+# --- Windows (deploy + in-game) ---
+powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo + MiOro a F:\Games\...\AddOns → /reload
 ```
 
 ## Subagentes del proyecto (`.claude/agents/`)
@@ -103,8 +160,8 @@ powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo a F:\Games
 - **NUNCA colocar trailers de co-autoría de IA** en los commits: nada de
   `Co-Authored-By: Claude ...` ni atribuciones de herramientas ("Generated with...").
   Mensajes limpios, como si los hubiera escrito el owner. (Regla heredada de taintlint.)
-- Mensajes: **Conventional Commits en español**, descriptivos. Al publicarse el repo
-  (nivel L), evaluar cambiar a inglés como taintlint.
+- Mensajes: **Conventional Commits en inglés**, descriptivos (decidido 2026-07-06 —
+  como taintlint). Los commits previos en español se dejan como están: NO reescribir historia.
 - **`main` SIEMPRE verde**; trabajo en `dev` (o ramas cortas → dev); merge a main solo en
   hitos completos. **Releases = tags semver `v*`** sobre main.
 - **MUST NOT `git push`** — lo hace el owner a mano. Commit/branch solo si el usuario lo pide.

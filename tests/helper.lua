@@ -54,6 +54,7 @@ local FILES = {
   "Weave/Weave.lua",
   "Weave/core/Core.lua",
   "Weave/core/Reconcile.lua",
+  "Weave/core/Tween.lua",
 }
 
 --- Loads a FRESH Weave instance (each spec starts from zero, no shared state).

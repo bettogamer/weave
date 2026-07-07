@@ -18,8 +18,25 @@
 > dinámica, secrets, combate con overflow y catch-up). **FR Craft + RELEASE v0.3.0**
 > (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core)
 > para consumidores "señal-o-literal"; `props._isCallable` delega en ellos; 192 tests.
-> Siguiente entregable: **M7 — docs para devs nuevos** (tutorial "tu primer addon
-> reactivo", <60 líneas).
+> **M7 COMPLETO — docs para devs nuevos** (sin ADR, solo docs): `docs/TUTORIAL.md` (tu
+> primer addon reactivo — contador de oro, tres pisos, ~15 líneas, sin secrets) + README
+> reescrito a la realidad v0.3.0; el tutorial se materializó como addon ejecutable
+> `demo/MiOro/`. Gates verdes (192 tests, luacheck 0/0, taintlint MiOro 0/0/0); **MiOro verificado
+> in-game por el owner (2026-07-06)**: contador de oro con iconos, actualización reactiva
+> al vender/comprar, sin handlers manuales. **CI añadido** (`.github/workflows/ci.yml`, verde en Actions):
+> suite en Lua 5.1 + luacheck + taintlint en push/PR.
+> **M8 EN CURSO — animaciones `Weave.tween`** (ADR-0008, tween-first, release v0.4.0 pendiente):
+> reactivo read-only que se desliza hacia el valor de una señal (número o array/color), con
+> `t:animating()` para coordinar entrada/salida. **Consumidor real: Craft** (select/modal/collapse).
+> Bloques 1-3 HECHOS. B1-2 (219 tests headless): motor puro `core/Tween.lua` + driver
+> `wow/Anim.lua` (compartido, combat-safe, coste cero en reposo; endurecido contra
+> re-entrancy: `onTick` desregistra el tween ANTES de notificar, así un re-target en el
+> instante en que termina —ping-pong— no lo congela). **B3 = demo `/weavetween`
+> VERIFICADA IN-GAME (2026-07-06)**: panel modal/collapse (fade alpha + expand height, salida
+> que oculta vía `:animating()`) + barra que desliza value/color (array tween). Cazado un
+> quirk de render de WoW (altura→0 no repinta al reabrir, ver §9), NO de Weave; fix del patrón:
+> alpha oculta, geometría colapsa a no-cero. **CRAFT-INTEGRATION §4.6 HECHA** (patrón tween +
+> caveat). Falta solo: **release v0.4.0** (bump .toc + LibStub MINOR 5, changelog, tag main).
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -100,7 +117,8 @@
 
 ## 8. Git / workflow
 
-- `main` estable + `dev` trabajo (modelo craft). Conventional Commits en español.
+- `main` estable + `dev` trabajo (modelo craft). Conventional Commits **en inglés**
+  (decidido 2026-07-06; los commits previos en español se dejan como están, no se reescribe historia).
 - Identidad git local: `Betto <betto.gamer@icloud.com>`. **Sin trailers de co-autoría de IA
   ni atribuciones de herramientas** en los commits (regla taintlint; detalle en CLAUDE.md §Git).
 - **MUST NOT `git push`** (lo hace el owner). Commit/branch solo si el usuario lo pide.
@@ -128,6 +146,19 @@
   1000.12` en coma flotante (el runner muestra "esperado 1000.12, obtenido 1000.12") →
   comparar contra la MISMA aritmética que hace el código (`t0 + dt1 + dt2`). _ticker_spec
   (2026-07-03)._
+- **Animar la ALTURA de un frame a 0 exacto y volver a crecer no repinta en el 2º+ ciclo** →
+  quirk de RENDER de WoW (NO es taint ni bug de Weave). Un frame cuya área renderizada colapsa
+  a 0 (`SetHeight(0)`) y luego crece **mantiene los valores correctos** (`GetHeight`/`GetAlpha`
+  los reportan bien) pero **no repinta** la geometría en aperturas posteriores; el PRIMER ciclo
+  va (render fresco), el segundo no. `Hide()`/`Show()` en sí NO es el problema (funciona), y
+  `clipsChildren` era un falso culpable secundario. Verificado tres veces que Weave entrega
+  valores animados correctos siempre (headless, repro con semántica in-game, y `GetAlpha`/
+  `GetHeight` in-game). **Patrón fiable (validado in-game 12.0.7):** (1) la **visibilidad total
+  la da el fade de alpha** (los hijos heredan el alpha del padre → a 0 es invisible); (2) si se
+  anima geometría (expand/collapse), colapsar a un **mínimo NO-cero** (altura de cabecera), NUNCA
+  a 0; (3) ocultar tras el fade con `shown = abierto or t:animating()` + `SetShown` es fiable
+  mientras la altura no toque 0. Craft debe seguir la misma regla en sus collapses. _Demo
+  `Weave.tween` M8, diagnosticado in-game con snapshots tween-vs-frame (2026-07-06)._
 
 ## 10. Registro de cambios
 
@@ -145,3 +176,4 @@
 | v0.10 | 2026-07-05 | **ADR-0007 (decisión del owner)**: `Weave.each` se adelanta de v1 a **M6** (demanda real: Coffer y Craft chocaron con el límite); docs para devs nuevos → M7. `each` cerrará con release v0.2.0. |
 | v0.11 | 2026-07-05 | **M6 completo + RELEASE v0.2.0**: `Weave.each` (core/Reconcile.lua puro + ui/Each.lua; render 1 vez por fila, datos por señales item/index, keying opcional, layout de pila, combate solo-recicla con catch-up en PLAYER_REGEN_ENABLED, opts.warm). 180 tests; demo `/weavelist` verificada in-game. CRAFT-INTEGRATION §4.5; bump LibStub MINOR 3; tag `v0.2.0` sobre main. |
 | v0.12 | 2026-07-05 | **FR Craft + RELEASE v0.3.0** (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core) para consumidores "señal-o-literal"; semántica estructural; `props._isCallable` delega en ellos (una sola definición). API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6; 12 tests (192 total); bump LibStub MINOR 4; tag `v0.3.0` sobre main. |
+| v0.13 | 2026-07-06 | **M8 completo + RELEASE v0.4.0** (ADR-0008): `Weave.tween` (motor puro `core/Tween.lua` + driver compartido `wow/Anim.lua`, combat-safe, coste cero en reposo; número o array; `t:animating()` para coordinar entrada/salida). Endurecido contra re-entrancy en `onTick` (ping-pong). Demo `/weavetween` verificada in-game (fade+expand+hide vía `:animating()`, array tween). Quirk de render de WoW cazado (altura→0 no repinta al reabrir; §9). CRAFT-INTEGRATION §4.6; 219 tests; bump LibStub MINOR 5; tag `v0.4.0` sobre main. |
