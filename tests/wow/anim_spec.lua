@@ -66,6 +66,26 @@ describe("Weave.tween: reactivo que se desliza hacia el valor de una señal", fu
       assert_eq(a:peek(), 0)
     end)
 
+    it("re-apuntar en el instante en que termina (ping-pong) no lo congela", function()
+      -- el re-arm cae DENTRO del onTick que lo da por terminado: un effect que
+      -- reacciona a :animating()=false lo manda de vuelta. El driver debe volver a
+      -- engancharlo, no dejarlo animando-pero-congelado.
+      local W = helper.loadWeaveWow()
+      local target = W.signal(0)
+      local a = W.tween(target, { duration = 1, easing = W.easing.linear })
+      W.effect(function()
+        if not a:animating() and a:peek() == 100 then target:set(0) end
+      end)
+      target:set(100)
+      helper.advanceTime(1) -- llega a 100 → el effect re-apunta a 0
+      assert_eq(a:peek(), 100, "toca el techo")
+      assert_true(a:animating(), "re-arranca de vuelta, no se queda parado")
+      helper.advanceTime(0.5)
+      assert_eq(a:peek(), 50, "baja desde 100 (si estuviera congelado seguiría en 100)")
+      helper.advanceTime(0.5)
+      assert_eq(a:peek(), 0)
+    end)
+
   end)
 
   describe(":animating() y coordinación de entrada/salida", function()

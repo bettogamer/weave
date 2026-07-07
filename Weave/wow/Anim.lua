@@ -37,12 +37,18 @@ local function onTick()
   for i = #activeList, 1, -1 do -- backward: safe to swap-remove finished tweens
     local tw = activeList[i]
     local value, done = tw._engine:at(now - tw._start)
-    tw._current:set(value)
     if done then
-      tw._animating:set(false)
+      -- Unregister BEFORE notifying: the _current/_animating sets below run user
+      -- effects synchronously; if one re-targets this tween (e.g. a ping-pong that
+      -- reverses on :animating()=false), arm() must see it as inactive so it re-adds
+      -- cleanly — otherwise this removal would clobber the re-arm and freeze the tween.
       active[tw] = nil
       activeList[i] = activeList[#activeList]
       activeList[#activeList] = nil
+      tw._current:set(value)
+      tw._animating:set(false)
+    else
+      tw._current:set(value)
     end
   end
   if #activeList == 0 and driverFrame then driverFrame:Hide() end
