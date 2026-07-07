@@ -162,6 +162,52 @@ end, {
 - The visible rows are listed on the container as `container._eachRows` (list
   order), handy for hit-testing and debugging.
 
+### 4.6 Animations: `Weave.tween` (v0.4+)
+
+`Weave.tween(target, opts)` returns a **read-only reactive** whose value *slides*
+toward `target()` over time instead of snapping. Bind it to any prop like a signal;
+it seeds at the current value, re-targets from wherever it is, degrades on secret,
+is combat-safe (it only mutates), and costs nothing at rest (one shared driver frame
+that hides itself when no animation is running). `target` may be a **number** or an
+**array of numbers** (interpolated per element — `{r,g,b}`, `{x,y}`).
+
+The one addition beyond a plain tween is **`t:animating()`** — a reactive boolean, true
+while an animation is in flight. It exists to coordinate the **exit** of a modal/collapse
+declaratively (no callbacks): keep the frame shown while opening OR while the closing
+animation still runs, so it hides *after* the fade, not before.
+
+```lua
+-- A modal/collapse: ONE boolean drives fade (alpha) + expand (height).
+local open   = self.props.open              -- a signal (or a literal for static)
+local alpha  = W.tween(W.computed(function() return open() and 1 or 0 end),
+  { duration = 0.15 })
+local height = W.tween(W.computed(function() return open() and FULL_H or HEADER_H end),
+  { duration = 0.15, easing = W.easing.outQuad })
+-- stays shown through the closing fade, then hides (frees clicks) — this is :animating()
+local shown  = W.computed(function() return open() or alpha:animating() end)
+
+W.bind(self.frame, "alpha",  alpha)
+W.bind(self.frame, "height", height)
+W.bind(self.frame, "shown",  shown)
+
+-- color as an array tween (e.g. a bar going red→green): lerped channel by channel
+local barColor = W.tween(W.computed(function()
+  return danger() and { 0.85, 0.2, 0.2 } or { 0.2, 0.8, 0.3 }
+end), { duration = 0.2 })
+W.bind(self.bar, "statusBarColor", barColor)
+```
+
+- `opts.duration` (default `0.3`), `opts.easing` (default `outQuad`; also `linear`,
+  `inQuad`, `inOutQuad`, or any `(t)→t`), `opts.fallback` (value exposed if the target
+  degrades to a secret). `Weave.spring` is reserved as a future sibling (ADR-0008).
+- **WoW render caveat — do NOT animate a frame's height to exactly 0.** A frame whose
+  rendered area collapses to 0 (`SetHeight(0)`) and then grows again does not repaint on
+  the 2nd+ cycle (WoW holds the right values — `GetHeight` proves it — but skips the
+  redraw). So a collapse should animate height to a **non-zero header height**, never 0;
+  full invisibility is the **alpha fade** (children inherit the parent's alpha). `Hide`/
+  `Show` (via the `shown` bind above) is fine. Verified in-game 12.0.7; not a Weave bug.
+- Create the tweens inside the component's scope (§4.2) so they dispose with the instance.
+
 ## 5. Taint rules (WoW 12.0+ secret values)
 
 Weave is taint-aware end to end; components inherit that if they follow two rules:

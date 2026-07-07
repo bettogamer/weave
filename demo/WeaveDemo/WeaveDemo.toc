@@ -9,3 +9,4 @@
 Demo.lua
 TaintTest.lua
 EachDemo.lua
+TweenDemo.lua
