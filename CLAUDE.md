@@ -77,14 +77,29 @@
     Siembra en el valor actual, re-targeting desde el valor actual, `t:animating()` reactivo
     (coordina entrada/salida: `shown = abierto or t:animating()`), degradación por secret,
     disposal por scope. Solo muta → combat-safe. Default easing `outQuad`. 13 tests.
-- **Siguiente (arrancar M8 bloque 3)**: **demo in-game** — es la validación que pide el ADR-0008
-  (la demo hace de primer validador antes de que Craft migre). Propuesto: panel toggled por slash
-  command con fundido+expansión al abrir y fundido de salida que se oculta al terminar (patrón
-  collapse/modal, `shown = abierto or animating`). Alternativa más simple: barra cuyo value/color
-  se desliza. Tras la demo (verificada in-game por el owner): **doc CRAFT-INTEGRATION** (patrón
-  tween, como §4.5 de each) y **release v0.4.0** (bump .toc + LibStub MINOR 5, tag sobre main).
-- **Pendientes de fondo** (post-M8): (1) verificación in-game de `/MiOro` (M7) — deploy+/reload,
-  ver el oro con iconos. (2) evaluar **nivel L** y **idioma de commits** a inglés. (3) avisar a
+- **M8 bloque 3 HECHO — demo verificada in-game** (2026-07-06): `demo/WeaveDemo/TweenDemo.lua`
+  (`/weavetween`) — panel modal/collapse (fade alpha + expand height, salida que se oculta vía
+  `shown = abierto or alpha:animating()`) + barra que desliza value/color (array tween). Gates
+  verdes (luacheck 0/0, taintlint 0/0). **Hallazgo (quirk de render de WoW, NO bug de Weave)**:
+  animar la ALTURA de un frame a **0 exacto** y volver a crecer no repinta la geometría en el
+  2º+ ciclo (1er ciclo va; síntoma según lo demás: con clipsChildren "no se ve", sin él "no
+  anima el expand"). `Hide/Show` sí funciona; `clipsChildren` era falso culpable. Verificado 3×
+  que Weave entrega valores correctos siempre (headless, repro semántica in-game, y `GetAlpha`/
+  `GetHeight` in-game). **Fix del patrón**: visibilidad total por fade de alpha; geometría
+  colapsa a un mínimo NO-cero (nunca 0). Detalle en AGENTS.md §9.
+- **Fix real en `wow/Anim.lua` (2026-07-06)**: re-entrancy en `onTick` — desregistrar el tween
+  ANTES de disparar `_current:set`/`_animating:set` (que corren effects síncronos); si uno
+  re-apunta el mismo tween en el instante en que termina (ping-pong / auto-reverse), `arm` lo
+  ve inactivo y lo re-engancha limpio en vez de dejarlo animando-pero-congelado. Test de
+  ping-pong en `tests/wow/anim_spec.lua`; 219 tests verde. Encontrado auditando a raíz de
+  "¿falta algo en anim?". (`Weave.spring` sigue reservado por diseño, ADR-0008 — no es un hueco.)
+- **CRAFT-INTEGRATION §4.6 HECHA** (2026-07-06): patrón tween para Craft (modal/collapse con
+  `shown = abierto or t:animating()`, array tween para color) + el caveat del `height→0`.
+- **Siguiente (cerrar M8)**: **release v0.4.0** — bump `.toc` (LibStub MINOR 5), fila en changelog
+  (§10 AGENTS.md), tag `v0.4.0` sobre main. Toca versión + git → commit/tag los hace el owner.
+- **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
+  in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
+  (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
   Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al
   re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
 
@@ -145,8 +160,8 @@ powershell -File scripts/deploy-local.ps1   # copia Weave + WeaveDemo + MiOro a 
 - **NUNCA colocar trailers de co-autoría de IA** en los commits: nada de
   `Co-Authored-By: Claude ...` ni atribuciones de herramientas ("Generated with...").
   Mensajes limpios, como si los hubiera escrito el owner. (Regla heredada de taintlint.)
-- Mensajes: **Conventional Commits en español**, descriptivos. Al publicarse el repo
-  (nivel L), evaluar cambiar a inglés como taintlint.
+- Mensajes: **Conventional Commits en inglés**, descriptivos (decidido 2026-07-06 —
+  como taintlint). Los commits previos en español se dejan como están: NO reescribir historia.
 - **`main` SIEMPRE verde**; trabajo en `dev` (o ramas cortas → dev); merge a main solo en
   hitos completos. **Releases = tags semver `v*`** sobre main.
 - **MUST NOT `git push`** — lo hace el owner a mano. Commit/branch solo si el usuario lo pide.
