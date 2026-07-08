@@ -145,6 +145,7 @@ local WOW_FILES = {
   "Weave/wow/Props.lua",
   "Weave/wow/Ticker.lua",
   "Weave/wow/Anim.lua",
+  "Weave/wow/Promise.lua",
   "Weave/store/Store.lua",
   "Weave/ui/Ui.lua",
   "Weave/ui/Each.lua",

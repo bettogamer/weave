@@ -110,6 +110,40 @@ local hp = Weave.fromUnitEvent("UNIT_HEALTH", "player",
   { fallback = 0 })                    -- opts de signal aplican (taint-aware)
 ```
 
+### `Weave.fromPromise(promise, opts?) → Signal` (M9 — ADR-0009)
+
+Convierte una **promesa de [Loom](../../loom)** en una señal read-only: el **gemelo one-shot**
+de `fromEvent` (una emite N veces, ésta asienta **una**). El puente lo posee Weave, no Loom
+(ADR-0009, espejo del ADR-0006 Craft↔Weave); consume solo la **API pública** de la promesa
+(`:next`/`:status`/`:isSecret`/`:cancel`), nunca sus internos. Requiere Loom cargado en runtime;
+Weave sigue siendo adoptable sin Loom (el feature simplemente no se usa).
+
+- **Arranca en `Weave.pending`** (centinela tabla, único por identidad) mientras la promesa no
+  ha asentado; al cumplirse, la señal toma el valor resuelto.
+- **Rechazo** → la señal pasa a **`Weave.rejected`** (otro centinela) y, si se pasó
+  `opts.onError`, se invoca `opts.onError(reason)` con el motivo estructurado de Loom
+  (`{ code, message }`). Ramificar en la vista es declarativo: `if sig() == W.pending then …`.
+- **Read-only**: `Weave.isReactive(sig)` → true, `Weave.isWritable(sig)` → false — el valor lo
+  posee el ciclo de vida de la promesa, no el consumidor.
+- **Cancelación por scope**: adscrita al scope activo; `scope:dispose()` llama `promise:cancel()`
+  (cascada estructural de Loom → desregistra el evento subyacente = cero leak de listeners).
+- **Taint** (§3): si el valor resuelto es secret, degrada con el mismo criterio que el resto
+  (fallback declarado o el secret fluye a sinks que lo aceptan); `opts` = las de signal.
+
+```lua
+-- Boundary "skeleton hasta resolver": placeholder mientras carga, valor al asentar.
+local itemSig = Weave.fromPromise(Loom.item(itemID), {
+  onError = function(err) print("no cargó:", err.code) end,
+})
+Weave.bind(icon, "texture", Weave.computed(function()
+  local v = itemSig()
+  if v == Weave.pending or v == Weave.rejected then
+    return "Interface/Icons/INV_Misc_QuestionMark"
+  end
+  return v.texture
+end))
+```
+
 ### `Weave.bind(frame, prop, source) → EffectHandle`
 
 Azúcar sobre `effect`: conecta una señal/computed (o cualquier llamable) a una propiedad
@@ -390,8 +424,12 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
   Craft, 2026-07-05).
 - **M8 / v0.4.0 (adelantado por ADR-0008):** `Weave.tween` — animaciones tween-first
   (número/array). Spec en §2. `Weave.spring` reservado como hermano futuro.
+- **M9 (ADR-0009):** `Weave.fromPromise` — puente a las promesas de Loom (señal read-only con
+  centinelas `pending`/`rejected`). Spec en §2.
 - **v2:** DevTools in-game `/weave` (W4) · `throttle`/`debounce`/`delay` (W5).
-- **Nunca** (north-star): async/promesas, red/comm, ciclo de vida de addon, slash commands.
+- **Nunca** (north-star): **implementar** async/promesas, red/comm, ciclo de vida de addon,
+  slash commands. (El motor async es de Loom; Weave solo *consume* su promesa vía
+  `fromPromise` — ADR-0009 — sin volverse una lib async.)
 
 ## 9. Roadmap de implementación
 
@@ -406,3 +444,4 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 | M6 | `Weave.each` (W2, adelantado por ADR-0007) + release v0.2.0 | suite headless + demo in-game con lista dinámica + ForceTaint + prueba EN combate (el pool recicla, jamás crea) |
 | M7 | docs para devs nuevos | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |
 | M8 | `Weave.tween` (animaciones tween-first, ADR-0008) + release v0.4.0 | suite headless (motor `core/Tween.lua`) + demo in-game deslizando bajo ForceTaint, coste cero en reposo |
+| M9 | `Weave.fromPromise` (puente a Loom, ADR-0009) | suite headless (promesa falsa = contrato público) + demo in-game boundary skeleton→valor→rechazo con Loom vendoreado |
