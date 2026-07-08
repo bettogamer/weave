@@ -1,0 +1,12 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+	<!-- Load order matters: entry first, then core/ (pure Lua), then the wow/ layer.
+	     Files are added here as each milestone implements them (mirrors tests/helper). -->
+	<Script file="Loom.lua"/>
+	<Script file="core\Core.lua"/>
+	<Script file="wow\Taint.lua"/>
+	<Script file="wow\Time.lua"/>
+	<Script file="wow\Event.lua"/>
+	<Script file="wow\Control.lua"/>
+	<Script file="wow\Catalog.lua"/>
+	<Script file="wow\Inspect.lua"/>
+</Ui>

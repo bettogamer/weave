@@ -13,7 +13,8 @@ globals = {
     -- APIs del juego usadas por la demo (demo/):
     "UnitHealth", "UnitHealthMax",
     "GetMoney", "GetCoinTextureString",
-    "SLASH_WEAVETAINT1", "SLASH_WEAVEWIDTH1", "SLASH_WEAVELIST1", "SLASH_WEAVETWEEN1", "SlashCmdList",
+    "SLASH_WEAVETAINT1", "SLASH_WEAVEWIDTH1", "SLASH_WEAVELIST1", "SLASH_WEAVETWEEN1",
+    "SLASH_WEAVEPROMISE1", "SlashCmdList",
 }
 
 ignore = {
@@ -32,4 +33,5 @@ exclude_files = {
     "related-addons/",
     "docs/",
     "Weave/libs/",   -- código de terceros vendoreado (LibStub): no se lintea ni se toca
+    "demo/WeaveDemo/libs/", -- Loom vendoreado (build etiquetado, READ-ONLY): linteado en su repo
 }
