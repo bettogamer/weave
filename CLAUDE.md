@@ -95,8 +95,39 @@
   "¿falta algo en anim?". (`Weave.spring` sigue reservado por diseño, ADR-0008 — no es un hueco.)
 - **CRAFT-INTEGRATION §4.6 HECHA** (2026-07-06): patrón tween para Craft (modal/collapse con
   `shown = abierto or t:animating()`, array tween para color) + el caveat del `height→0`.
-- **Siguiente (cerrar M8)**: **release v0.4.0** — bump `.toc` (LibStub MINOR 5), fila en changelog
-  (§10 AGENTS.md), tag `v0.4.0` sobre main. Toca versión + git → commit/tag los hace el owner.
+- **M8 CERRADO + RELEASE v0.4.0 HECHO** (2026-07-06): tag `v0.4.0` sobre main (commit
+  `14197f0`), LibStub MINOR 5, changelog §10 v0.13. `main` == `dev`, árbol limpio, 219 tests verde.
+- **M9 IMPLEMENTADO — `Weave.fromPromise` (puente con Loom)** (2026-07-07, ADR-0009). Loom
+  (`Workspace/loom`, v0.1.0, verificada in-game) cubre "datos que llegan tarde" (item/spell/inspect:
+  request→evento→resolve). Por su **ADR-0010** el puente promesa→señal lo posee **Weave** (Loom no
+  conoce a Weave — paralelo exacto de nuestro ADR-0006 Craft↔Weave). Entregado (B1-B4, headless verde
+  + demo montada):
+  - `Weave/wow/Promise.lua` (~45 líneas): `Weave.pending`/`Weave.rejected` (centinelas tabla) +
+    `Weave.fromPromise(promise, opts)` = gemelo **one-shot** de `fromEvent`. Señal interna writable +
+    handle `computed` **read-only** (el valor lo posee la promesa). Usa SOLO la API pública de la
+    promesa (`:next`/`:cancel`), nunca internos `_`. Decisiones del owner: (a) centinela
+    `Weave.pending`; (b) rechazo → `Weave.rejected` + `opts.onError(reason)` opcional; (c)
+    `scope:dispose()` → `promise:cancel()` (cero leak, cascada estructural Loom ADR-0011).
+  - Degradación por secret vía el `fallback` del signal interno (mismo camino que `fromEvent`).
+  - `tests/wow/promise_spec.lua`: **15 tests** con promesa falsa = contrato público (NO mock de WoW).
+  - Docs: ADR-0009, API-v0 §2 (spec + §8 matiz "nunca *implementar* async" + §9 fila M9). Registrado
+    en `Weave.xml` + `wow_helper.lua`.
+  - **Demo `/weavepromise`** (`demo/WeaveDemo/PromiseDemo.lua`): carga item con Loom.item → fromPromise
+    → panel skeleton→valor→rechazo; cada carga en su scope (dispose cancela la anterior). **Loom v0.1.0
+    vendoreado READ-ONLY** en `demo/WeaveDemo/libs/Loom/` (sin su libs/; LibStub lo da Weave; nota en
+    `VENDORED.md`). `.luacheckrc`: `SLASH_WEAVEPROMISE1` + exclude `demo/WeaveDemo/libs/`.
+  - Gates verdes: suite **234** (+15), luacheck 0/0 (13 files), taintlint 0 err/0 warn (4 INFO benignos:
+    2 SV010 pre-exist. Demo.lua + 2 SV011 del Loom vendoreado — guarda con `and`, correcto).
+  - **VERIFICADO IN-GAME** por el owner (2026-07-07): `/weavepromise` OK (skeleton→item, `bad`→rejected).
+    El puente Loom→Weave funciona end-to-end sobre la API pública de la promesa (validación del ADR-0009).
+  - **RELEASE v0.5.0 HECHO** (2026-07-07): bump `.toc` Version + `Weave.lua` LibStub MINOR 6 + `_VERSION`,
+    fila changelog §10 v0.14, commits (feat wow + feat demo + chore release), `dev` mergeado a `main`,
+    tag `v0.5.0` sobre main. **`git push` lo hace el owner a mano** (regla del repo; Claude no pushea).
+- **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
+  in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
+  (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
+  Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al
+  re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a

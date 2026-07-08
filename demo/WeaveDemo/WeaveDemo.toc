@@ -6,7 +6,9 @@
 ## Dependencies: Weave
 ## SavedVariables: WeaveDemoDB
 
+libs\Loom\Loom.xml
 Demo.lua
 TaintTest.lua
 EachDemo.lua
 TweenDemo.lua
+PromiseDemo.lua

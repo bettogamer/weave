@@ -25,10 +25,10 @@ jobs:
         run: lua tests/run.lua tests/core/*_spec.lua tests/wow/*_spec.lua tests/store/*_spec.lua tests/ui/*_spec.lua
 
       - name: luacheck — library
-        run: luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/core/Tween.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/wow/Anim.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
+        run: luacheck Weave/Weave.lua Weave/core/Core.lua Weave/core/Reconcile.lua Weave/core/Tween.lua Weave/wow/Events.lua Weave/wow/Props.lua Weave/wow/Ticker.lua Weave/wow/Anim.lua Weave/wow/Promise.lua Weave/store/Store.lua Weave/ui/Ui.lua Weave/ui/Each.lua --config .luacheckrc
 
       - name: luacheck — demo
-        run: luacheck demo/WeaveDemo/Demo.lua demo/WeaveDemo/EachDemo.lua demo/WeaveDemo/TaintTest.lua demo/MiOro/MiOro.lua --config .luacheckrc
+        run: luacheck demo/WeaveDemo/Demo.lua demo/WeaveDemo/EachDemo.lua demo/WeaveDemo/TaintTest.lua demo/WeaveDemo/PromiseDemo.lua demo/MiOro/MiOro.lua --config .luacheckrc
 
   taintlint:
     name: taintlint (.toc)

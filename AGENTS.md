@@ -36,7 +36,18 @@
 > que oculta vía `:animating()`) + barra que desliza value/color (array tween). Cazado un
 > quirk de render de WoW (altura→0 no repinta al reabrir, ver §9), NO de Weave; fix del patrón:
 > alpha oculta, geometría colapsa a no-cero. **CRAFT-INTEGRATION §4.6 HECHA** (patrón tween +
-> caveat). Falta solo: **release v0.4.0** (bump .toc + LibStub MINOR 5, changelog, tag main).
+> caveat). **M8 CERRADO + RELEASE v0.4.0 HECHO** (tag `v0.4.0` sobre main, LibStub MINOR 5,
+> changelog §10 v0.13; 219 tests verde).
+> **M9 IMPLEMENTADO — `Weave.fromPromise` (puente con Loom, ADR-0009)**: gemelo one-shot de
+> `fromEvent` que vuelve señal read-only una promesa de Loom. Consume SOLO la API pública de la
+> promesa (`:next`/`:cancel`), Loom queda 100% ignorante de Weave (dep unidireccional Weave→Loom,
+> como Weave→WoW; espejo de ADR-0006). Centinela `Weave.pending`; rechazo → `Weave.rejected` +
+> `opts.onError`; `scope:dispose()` → `promise:cancel()` (cero leak). `wow/Promise.lua` + 15 tests
+> (promesa falsa = contrato público, no mock WoW) + demo `/weavepromise` con **Loom v0.1.0
+> vendoreado READ-ONLY** en `demo/WeaveDemo/libs/Loom/`. Suite 234, luacheck 0/0, taintlint 0/0
+> (4 INFO benignos). **VERIFICADO IN-GAME** (owner, 2026-07-07): `/weavepromise` OK (skeleton→item,
+> `bad`→rejected). **RELEASE v0.5.0 HECHO** (LibStub MINOR 6, changelog §10 v0.14, `dev`→`main`,
+> tag `v0.5.0`). Solo falta el `git push` del owner.
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -177,3 +188,4 @@
 | v0.11 | 2026-07-05 | **M6 completo + RELEASE v0.2.0**: `Weave.each` (core/Reconcile.lua puro + ui/Each.lua; render 1 vez por fila, datos por señales item/index, keying opcional, layout de pila, combate solo-recicla con catch-up en PLAYER_REGEN_ENABLED, opts.warm). 180 tests; demo `/weavelist` verificada in-game. CRAFT-INTEGRATION §4.5; bump LibStub MINOR 3; tag `v0.2.0` sobre main. |
 | v0.12 | 2026-07-05 | **FR Craft + RELEASE v0.3.0** (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core) para consumidores "señal-o-literal"; semántica estructural; `props._isCallable` delega en ellos (una sola definición). API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6; 12 tests (192 total); bump LibStub MINOR 4; tag `v0.3.0` sobre main. |
 | v0.13 | 2026-07-06 | **M8 completo + RELEASE v0.4.0** (ADR-0008): `Weave.tween` (motor puro `core/Tween.lua` + driver compartido `wow/Anim.lua`, combat-safe, coste cero en reposo; número o array; `t:animating()` para coordinar entrada/salida). Endurecido contra re-entrancy en `onTick` (ping-pong). Demo `/weavetween` verificada in-game (fade+expand+hide vía `:animating()`, array tween). Quirk de render de WoW cazado (altura→0 no repinta al reabrir; §9). CRAFT-INTEGRATION §4.6; 219 tests; bump LibStub MINOR 5; tag `v0.4.0` sobre main. |
+| v0.14 | 2026-07-07 | **M9 completo + RELEASE v0.5.0** (ADR-0009): `Weave.fromPromise` — puente a las promesas de [Loom](../loom) (lib hermana async). Gemelo one-shot de `fromEvent`: señal read-only sembrada en centinela `Weave.pending`, rechazo → `Weave.rejected` + `opts.onError`, cancelación por `scope:dispose()` → `promise:cancel()` (cero leak). Consume SOLO la API pública de la promesa; Loom queda ignorante de Weave (dep unidireccional Weave→Loom, espejo de ADR-0006). `wow/Promise.lua` + 15 tests (promesa falsa = contrato público). Demo `/weavepromise` verificada in-game con **Loom v0.1.0 vendoreado READ-ONLY** en `demo/WeaveDemo/libs/Loom/`. API-v0 §2/§8/§9; 234 tests; bump LibStub MINOR 6; tag `v0.5.0` sobre main. |
