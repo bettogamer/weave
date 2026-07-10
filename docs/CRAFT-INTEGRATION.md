@@ -246,6 +246,15 @@ craftScrollbar.onChange = function(px) scroll:set(px) end                      -
 - The chrome (header, scrollbar) must be a **sibling** of the viewport, not a child:
   `virtual` sets `SetClipsChildren(true)` on the container, so children outside the
   viewport bounds get clipped.
+- **Keep your scroll signal in range.** When the list shrinks below the current scroll
+  (e.g. collapsing the last group while scrolled to the bottom), `virtual` clamps its
+  *painting*, but the scroll signal is **yours** — it only reads it. Re-clamp it:
+  ```lua
+  W.effect(function()
+    local maxS = math.max(0, grid:contentHeight() - viewportHeight) -- tracked
+    if scroll:peek() > maxS then scroll:set(maxS) end               -- peek: no loop
+  end)
+  ```
 - Keying is positional (the window case); `render` is one homogeneous cell type in
   Fase 1. Interleaved group headers (heterogeneous rows) land in a later release.
 - Create it inside the component's scope (§4.2) so it disposes with the instance.

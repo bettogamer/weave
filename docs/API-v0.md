@@ -396,9 +396,30 @@ W.new("Frame", {
 - **Degradación taint (ADR-0003):** un dato secreto fluye a los sinks que lo aceptan; su lectura
   numérica se marca ("??"); nunca un popup. Mismo criterio que `each`.
 - **Disposal:** adscrito al scope activo; `dispose()` libera binds del pool y oculta los frames.
-- **Fase 2 (release siguiente, ADR-0010) — cabeceras heterogéneas:** `opts.typeOf(entry) → tipo`
-  + `render` como tabla `{ item = fn, header = fn }` con pool y alto por tipo, para intercalar
-  cabeceras de grupo (con "(n)" y colapso) en el mismo stream. **No** entra en Fase 1.
+- **Filas heterogéneas (Fase 2, v0.7+):** para intercalar **cabeceras de grupo** con los ítems en
+  el mismo stream virtualizado, en vez de `render`/`rowHeight` se pasa `opts.typeOf(entry) → tipo`
+  + `opts.types = { [tipo] = { render = fn, height = N, grid = bool } }`:
+  ```lua
+  W.virtual(stream, {
+    parent = box, viewport = { 240, 400 }, columns = 6, scroll = scroll,
+    typeOf = function(e) return e.kind end,        -- devuelve una clave de `types`
+    types = {
+      item   = { render = renderItem,   height = 40, grid = true }, -- fluye en las N columnas
+      header = { render = renderHeader,  height = 24 },             -- ancho completo, fila propia
+    },
+  })
+  ```
+  - `grid = true` → ese tipo fluye en el grid de `columns`. Sin `grid` → **ancho completo** (fila
+    visual propia; `virtual` le hace `SetWidth(viewport.w)`). Una cabecera **rompe el flujo**: los
+    ítems tras ella empiezan en columna 0 de una fila nueva.
+  - **Pool por tipo** (una celda horneada como cabecera no recicla como ítem), cada uno dimensionado
+    al peor caso de visibilidad de ese tipo (acotado por el viewport). Layout por el planificador
+    puro `core/Flow.lua` (`_flowLayout` por cambio de datos + `_flowVisible` por scroll, búsqueda
+    binaria). Keying posicional, igual que Fase 1.
+  - **El colapso lo posee el consumidor** (ADR-0010): `virtual` es un motor de ventana sobre un
+    stream plano — no sabe qué es un "grupo". Colapsar = poner un stream nuevo sin los ítems de ese
+    grupo (el `render` de la cabecera trae la flecha + un click que re-setea la señal del stream).
+  - Combate/taint/disposal idénticos a Fase 1. `render`(fn) y `types` son excluyentes.
 
 ## 5. Estado persistente (`Weave/store/` — W3, ADR-0005)
 
