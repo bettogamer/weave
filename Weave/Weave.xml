@@ -5,6 +5,7 @@
 	<Script file="core\Reconcile.lua"/>
 	<Script file="core\Tween.lua"/>
 	<Script file="core\Window.lua"/>
+	<Script file="core\Flow.lua"/>
 	<Script file="wow\Events.lua"/>
 	<Script file="wow\Props.lua"/>
 	<Script file="wow\Ticker.lua"/>

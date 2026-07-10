@@ -1,0 +1,212 @@
+-- WeaveDemo/VirtualGroupsDemo.lua — M10 Fase 2 field test for Weave.virtual: a
+-- HETEROGENEOUS virtualized grid — full-width category headers interleaved with a grid
+-- of item cells, in ONE virtualized stream. /weavegroups shows:
+--   * heterogeneous rows → a pool PER TYPE (headers never recycle as items)
+--   * collapse           → the CONSUMER owns it (ADR-0010): the stream is a computed
+--                          over a `collapsed` signal; clicking a header toggles it and
+--                          the whole grid re-windows. virtual never knows what a group is.
+--   * wheel              → fractional scroll over the mixed-height stream
+--
+-- Collapse the categories and watch the grid reflow — virtual just paints whatever flat
+-- stream the computed produces.
+
+local W = LibStub("Weave-1.0")
+
+local COLS         = 4
+local VIEWW, VIEWH = COLS * 40, 320
+local SBW          = 10 -- scrollbar width
+
+-- STATE: categories, and a signal of which ones are collapsed.
+local CATS = {
+  { id = "consum",  name = "Consumables", n = 10 },
+  { id = "weapons", name = "Weapons",     n = 5  },
+  { id = "armor",   name = "Armor",       n = 14 },
+  { id = "misc",    name = "Misc",        n = 7  },
+}
+local collapsed = W.signal({}) -- { [catId] = true }
+local scroll    = W.signal(0)  -- px; wheel AND the scrollbar move it
+
+-- STREAM: header + (unless collapsed) its items. A computed over `collapsed`, so toggling
+-- a category produces a NEW flat stream and virtual re-windows. This is the whole trick:
+-- collapse is just "a different stream", the consumer's business — not virtual's.
+local stream = W.computed(function()
+  local closed = collapsed()
+  local out = {}
+  for _, c in ipairs(CATS) do
+    out[#out + 1] = { kind = "header", cat = c }
+    if not closed[c.id] then
+      for k = 1, c.n do out[#out + 1] = { kind = "item", cat = c.id, k = k } end
+    end
+  end
+  return out
+end)
+
+local function toggle(id)
+  local t = {}
+  for k, v in pairs(collapsed:peek()) do t[k] = v end
+  t[id] = (not t[id]) or nil
+  collapsed:set(t)
+end
+
+-- RENDER: one recipe per type. Runs ONCE per pooled frame; data flows in via item().
+local function renderHeader(item)
+  return W.new("Button", {
+    [W.children] = {
+      W.new("Texture", {
+        layer = "BACKGROUND", points = { { "TOPLEFT" }, { "BOTTOMRIGHT" } },
+        texture = "Interface\\Buttons\\WHITE8x8", vertexColor = { 0.2, 0.3, 0.42, 0.95 },
+      }),
+      W.new("FontString", {
+        layer = "OVERLAY", point = { "LEFT", 6, 0 }, template = "GameFontNormalSmall",
+        text = W.computed(function()
+          local e = item(); if not e then return "" end
+          local arrow = collapsed()[e.cat.id] and "|cffffd100[+]|r" or "|cffffd100[-]|r"
+          return arrow .. " " .. e.cat.name .. " (" .. e.cat.n .. ")"
+        end),
+      }),
+    },
+    [W.on] = {
+      OnMouseDown = function()
+        local e = item() -- the header's current category (changes as the frame re-glazes)
+        if e then toggle(e.cat.id) end
+      end,
+    },
+  })
+end
+
+local function renderItem(item)
+  return W.new("Button", {
+    size = { 36, 36 },
+    [W.children] = {
+      W.new("Texture", {
+        layer = "BACKGROUND", points = { { "TOPLEFT" }, { "BOTTOMRIGHT" } },
+        texture = "Interface\\Buttons\\WHITE8x8", vertexColor = { 0.16, 0.17, 0.22, 0.95 },
+      }),
+      W.new("FontString", {
+        layer = "OVERLAY", point = { "CENTER" }, template = "GameFontHighlightSmall",
+        text = W.computed(function()
+          local e = item(); return e and tostring(e.k) or ""
+        end),
+      }),
+    },
+  })
+end
+
+-- PANEL + viewport (virtual clips the viewport; title/scrollbar are siblings, not children).
+local panel = W.new("Frame", {
+  name = "WeaveGroupsDemo", point = { "CENTER", -330, 0 }, size = { VIEWW + SBW + 30, VIEWH + 40 },
+  [W.children] = {
+    W.new("Texture", {
+      layer = "BACKGROUND", points = { { "TOPLEFT" }, { "BOTTOMRIGHT" } },
+      texture = "Interface\\Buttons\\WHITE8x8", vertexColor = { 0, 0, 0, 0.65 },
+    }),
+    W.new("FontString", {
+      layer = "OVERLAY", point = { "TOPLEFT", 12, -10 },
+      template = "GameFontNormal", text = "Weave.virtual grouped — /weavegroups",
+    }),
+  },
+})
+local viewport = W.new("Frame", {
+  name = "WeaveGroupsViewport", parent = panel,
+  point = { "TOPLEFT", "WeaveGroupsDemo", "TOPLEFT", 12, -30 }, size = { VIEWW, VIEWH },
+})
+
+-- opts.parent → returns the instance so we can read :contentHeight() for the scrollbar.
+local v = W.virtual(stream, {
+  parent = viewport, viewport = { VIEWW, VIEWH }, columns = COLS, spacing = 2, scroll = scroll,
+  typeOf = function(e) return e.kind end,
+  types = {
+    item   = { render = renderItem,   height = 38, grid = true }, -- flows in the 4-col grid
+    header = { render = renderHeader,  height = 20 },             -- full-width, breaks the flow
+  },
+})
+
+local function clampScroll(s)
+  local maxS = math.max(0, v:contentHeight() - VIEWH)
+  if s < 0 then return 0 elseif s > maxS then return maxS end
+  return s
+end
+
+-- When the content shrinks (e.g. collapsing the last group while scrolled to the bottom),
+-- our scroll signal can point past the new end. virtual clamps its PAINTING, but the
+-- scroll signal is OURS — virtual only reads it (ADR-0006). So we keep it in range here.
+W.effect(function()
+  local maxS = math.max(0, v:contentHeight() - VIEWH) -- tracked: re-runs when content changes
+  if scroll:peek() > maxS then scroll:set(maxS) end   -- peek: no loop
+end)
+
+-- Wheel scrolls the viewport (delta -1 = down).
+viewport:EnableMouseWheel(true)
+viewport:SetScript("OnMouseWheel", function(_, delta)
+  scroll:set(clampScroll(scroll:peek() - delta * 38))
+end)
+
+-- SCROLLBAR: sibling of the viewport. Thumb height/position are a reactive read of
+-- scroll()/contentHeight() — and it's draggable (bar → signal → virtual, two-way).
+W.new("Frame", {
+  name = "WeaveGroupsTrack", parent = panel,
+  point = { "TOPLEFT", "WeaveGroupsViewport", "TOPRIGHT", 6, 0 }, size = { SBW, VIEWH },
+  [W.children] = {
+    W.new("Texture", {
+      layer = "BACKGROUND", points = { { "TOPLEFT" }, { "BOTTOMRIGHT" } },
+      texture = "Interface\\Buttons\\WHITE8x8", vertexColor = { 1, 1, 1, 0.08 },
+    }),
+  },
+})
+local track = _G.WeaveGroupsTrack
+local thumb = W.new("Button", {
+  parent = track, size = { SBW, 40 }, point = { "TOP", 0, 0 },
+  [W.children] = {
+    W.new("Texture", {
+      layer = "ARTWORK", points = { { "TOPLEFT" }, { "BOTTOMRIGHT" } },
+      texture = "Interface\\Buttons\\WHITE8x8", vertexColor = { 0.5, 0.6, 0.95, 0.9 },
+    }),
+  },
+})
+
+local function thumbHeight()
+  local ch = v:contentHeight()
+  if ch <= VIEWH then return VIEWH end
+  local h = VIEWH * VIEWH / ch
+  return h < 24 and 24 or h
+end
+
+W.effect(function()
+  local maxS = math.max(0, v:contentHeight() - VIEWH)
+  local h = thumbHeight()
+  local y = maxS > 0 and -(scroll() / maxS) * (VIEWH - h) or 0
+  thumb:SetHeight(h)
+  thumb:ClearAllPoints()
+  thumb:SetPoint("TOP", track, "TOP", 0, y)
+end)
+
+local dragging, startCursorY, startScroll = false, 0, 0
+thumb:SetScript("OnMouseDown", function()
+  dragging = true
+  local _, cy = GetCursorPosition()
+  startCursorY, startScroll = cy, scroll:peek()
+end)
+thumb:SetScript("OnMouseUp", function() dragging = false end)
+thumb:SetScript("OnUpdate", function()
+  if not dragging then return end
+  local maxS = math.max(0, v:contentHeight() - VIEWH)
+  if maxS <= 0 then return end
+  local travel = VIEWH - thumbHeight()
+  local _, cy = GetCursorPosition()
+  local dy = (startCursorY - cy) / thumb:GetEffectiveScale()
+  scroll:set(clampScroll(startScroll + dy * (maxS / travel)))
+end)
+
+-- /weavegroups: toggle-all + help
+SLASH_WEAVEGROUPS1 = "/weavegroups"
+SlashCmdList.WEAVEGROUPS = function(msg)
+  if msg == "collapse" then
+    local t = {}; for _, c in ipairs(CATS) do t[c.id] = true end; collapsed:set(t)
+  elseif msg == "expand" then
+    collapsed:set({})
+  else
+    print("|cffffd100WeaveGroupsDemo:|r /weavegroups collapse · expand — click a header to"
+      .. " toggle its group; wheel to scroll. The stream is a computed over one signal;"
+      .. " virtual just windows whatever flat stream it gets.")
+  end
+end
