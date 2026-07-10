@@ -317,10 +317,11 @@ W.new("Frame", {
 - **Layout:** pila vertical simple (fila i+1 anclada bajo la fila i; `opts.spacing`,
   default 0). `opts.layout = false` la desactiva (el consumidor posiciona — caso
   DragList de Craft). Nada más en v0.2: grids/scroll no son de `each`.
-- **Virtualización = composición, no feature:** para listas grandes, la ventana visible
-  es un computed que recorta (`scrollPos` señal + slice) y `each` por índice pinta solo
-  esa ventana — el pool queda fijo en N filas visibles que se re-rellenan (patrón Sorted,
-  con la seguridad que a Sorted le falta).
+- **Listas grandes → `Weave.virtual` (M10, ADR-0010):** para miles de entradas con scroll,
+  grid o cabeceras, `each` no es la herramienta — usa el primitivo hermano `Weave.virtual`
+  (abajo), que trae la ventana virtual, el scroll fraccional y el grid de fábrica. Regla:
+  ¿lista chica con estado por fila / DragList? → `each`. ¿miles de entradas con scroll? →
+  `virtual`.
 - **Combate (la razón de ser del pooling):** reusar/re-asignar/ocultar/re-posicionar es
   combat-safe; **materializar filas nuevas NO**. Si la lista crece en combate y el pool
   no alcanza: pinta lo que el pool permita, avisa una vez (canal del chokepoint) y
@@ -329,6 +330,75 @@ W.new("Frame", {
   crecimiento en combate.
 - **Disposal:** el descriptor queda adscrito al scope activo (como todo en `ui/`);
   `dispose()` libera binds de todas las filas y oculta los frames.
+
+### `Weave.virtual(source, opts) → VirtualDescriptor` (M10 — ADR-0010)
+
+Grid **virtualizado** con pool fijo, hermano de `each` para listas de **miles** de entradas
+(inventario, DB). A diferencia de `each` (un frame por entrada), `virtual` mantiene un pool
+**fijo de ~N filas visibles** (derivado del alto del viewport) y lo re-rellena al scrollear:
+el pool nunca crece con la lista. `source` es una señal/computed (o llamable) que devuelve el
+**array denso completo** (no una ventana recortada — recortar es trabajo de `virtual`).
+
+```lua
+local scroll = W.signal(0) -- posición en píxeles; la barra de Craft la mueve
+
+W.new("Frame", {
+  size = { 6 * 40, 400 },  -- viewport: 6 columnas × 40px, 400px de alto
+  [W.children] = {
+    W.virtual(bagItems, {
+      viewport  = { 6 * 40, 400 }, -- área visible (ancho, alto)
+      rowHeight = 40,
+      columns   = 6,               -- grid; 1 = lista de una columna
+      spacing   = 2,
+      scroll    = scroll,          -- señal externa (opcional; sin ella, virtual la crea)
+      render = function(item, index)
+        -- corre UNA vez por fila del pool; item/index son SEÑALES read-only
+        return W.new("Button", { size = { 38, 38 }, ... })
+      end,
+    }),
+  },
+})
+```
+
+- **`render(item, index) → frame`** corre **una vez por fila del pool** (idéntico a `each`):
+  crea el frame y enchufa los binds a `item`/`index`. Al scrollear, `virtual` NO toca frames:
+  re-asigna datos (la entrada que cae en cada slot) y re-posiciona el pool. **Fase 1: `render`
+  homogéneo** (un solo tipo de fila).
+- **Ventana virtual:** `virtual` calcula, según `scroll`, qué franja del array es visible y
+  pinta solo esas filas en el pool fijo. El pool se dimensiona a `ceil(viewport_h / rowHeight)
+  × columns + 1` filas (la fila extra cubre el scroll fraccional). El motor de ventana es puro
+  (`core/`, `Weave._windowPlan`) y se testea headless.
+- **Scroll fraccional:** `scroll` es una posición en **píxeles** (`0..max`), no un índice de
+  fila. El pool se desplaza por offset de anchor (no salta de fila entera) → scroll suave.
+- **Recorte:** `virtual` hace `SetClipsChildren(true)` sobre el contenedor (que ES el viewport):
+  el pool guarda una fila extra para el desbordamiento fraccional, y sin recortar esa fila se
+  saldría por abajo. Es automático — el consumidor no tiene que acordarse. Corolario: header,
+  barra de scroll y demás cromo van FUERA del contenedor (hermanos), o el recorte los corta.
+- **Grid (`opts.columns`):** `columns = N` coloca la entrada `i` en `(fila = i//N, col = i%N)`.
+  `columns = 1` (default) es lista de una columna. El wrap lo resuelve `virtual` (no depende del
+  layout de Craft).
+- **Scroll = señal externa (integración Craft, ADR-0006):** `opts.scroll` es una señal que
+  **trae el consumidor** (la barra de scroll de Craft la mueve); `virtual` solo la lee.
+  `virtual:contentHeight()` es un computed que `virtual` **expone** con el alto total de la
+  lista completa (`ceil(#source / columns) × (rowHeight + spacing)`) → la barra de Craft
+  dimensiona su thumb y su `max`. Si `opts.scroll` se omite, `virtual` crea su propia señal y
+  engancha la rueda del ratón (funciona solo, sin Craft). Weave nunca menciona a Craft:
+  comparten una señal (posición hacia dentro, `contentHeight` hacia fuera).
+- **Identidad (keying):** **por posición** (slot i ↔ entrada visible i — el caso ventana de
+  scroll: el dato fluye por el slot al scrollear). Es el modo de Fase 1 y el correcto para una
+  ventana virtual. Identidad estable con `opts.key` (conservar el frame de un dato al
+  filtrar/reordenar dentro de la ventana visible) queda para más adelante — la ventana virtual
+  no la necesita, y `each` la cubre para listas chicas.
+- **Combate (combat-safe idéntico a `each`):** re-asignar/re-posicionar/ocultar es combat-safe;
+  materializar filas nuevas NO. En régimen el pool es fijo → scrollear en combate no materializa
+  nada. Si el viewport crece en combate y el pool no alcanza: pinta lo que permita, avisa una vez
+  y completa en `PLAYER_REGEN_ENABLED`. `opts.warm` reservado igual que en `each`.
+- **Degradación taint (ADR-0003):** un dato secreto fluye a los sinks que lo aceptan; su lectura
+  numérica se marca ("??"); nunca un popup. Mismo criterio que `each`.
+- **Disposal:** adscrito al scope activo; `dispose()` libera binds del pool y oculta los frames.
+- **Fase 2 (release siguiente, ADR-0010) — cabeceras heterogéneas:** `opts.typeOf(entry) → tipo`
+  + `render` como tabla `{ item = fn, header = fn }` con pool y alto por tipo, para intercalar
+  cabeceras de grupo (con "(n)" y colapso) en el mismo stream. **No** entra en Fase 1.
 
 ## 5. Estado persistente (`Weave/store/` — W3, ADR-0005)
 
@@ -426,6 +496,8 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
   (número/array). Spec en §2. `Weave.spring` reservado como hermano futuro.
 - **M9 (ADR-0009):** `Weave.fromPromise` — puente a las promesas de Loom (señal read-only con
   centinelas `pending`/`rejected`). Spec en §2.
+- **M10 (ADR-0010):** `Weave.virtual` — grid virtualizado (pool fijo, scroll fraccional, grid;
+  cabeceras heterogéneas en Fase 2). Spec en §4.
 - **v2:** DevTools in-game `/weave` (W4) · `throttle`/`debounce`/`delay` (W5).
 - **Nunca** (north-star): **implementar** async/promesas, red/comm, ciclo de vida de addon,
   slash commands. (El motor async es de Loom; Weave solo *consume* su promesa vía
@@ -445,3 +517,4 @@ bajo ForceTaint muestra los fallbacks sin un solo error Lua.
 | M7 | docs para devs nuevos | tutorial "tu primer addon reactivo" (<60 líneas, 3 pisos) |
 | M8 | `Weave.tween` (animaciones tween-first, ADR-0008) + release v0.4.0 | suite headless (motor `core/Tween.lua`) + demo in-game deslizando bajo ForceTaint, coste cero en reposo |
 | M9 | `Weave.fromPromise` (puente a Loom, ADR-0009) | suite headless (promesa falsa = contrato público) + demo in-game boundary skeleton→valor→rechazo con Loom vendoreado |
+| M10 | `Weave.virtual` — grid virtualizado (ADR-0010): Fase 1 ventana+scroll+grid (release), Fase 2 cabeceras heterogéneas | motor de ventana `core/` headless + demo in-game con miles de filas, scroll fraccional, grid, ForceTaint + prueba EN combate (pool fijo, jamás crea) |

@@ -208,6 +208,48 @@ W.bind(self.bar, "statusBarColor", barColor)
   `Show` (via the `shown` bind above) is fine. Verified in-game 12.0.7; not a Weave bug.
 - Create the tweens inside the component's scope (§4.2) so they dispose with the instance.
 
+### 4.7 Virtualized grids: `Weave.virtual` (v0.6+)
+
+`Weave.each` bakes one frame per entry — perfect for small dynamic lists (auras, a
+DragList). For a bag/inventory grid of **thousands** of entries, use its sibling
+`Weave.virtual`, which keeps a **fixed pool** of ~N visible cells (sized to the
+viewport) and re-glazes them as you scroll: the pool never grows with the list.
+
+```lua
+-- Craft owns the scrollbar; Weave owns the windowing. They share ONE signal.
+local scroll = W.signal(0) -- position in px; your Craft scrollbar moves it
+
+local grid = W.virtual(self.props.items, {
+  parent    = self.viewport,     -- the container IS the viewport (virtual clips it)
+  viewport  = { 240, 400 },
+  rowHeight = 40,
+  columns   = 6,                 -- 1 = single-column list
+  scroll    = scroll,            -- virtual only READS it
+  render    = function(item, index)
+    return W.new("Button", { size = { 38, 38 } }) -- runs ONCE per pooled cell
+  end,
+})
+
+-- Wire your Craft scrollbar to the shared signal + the exposed content height:
+W.effect(function() craftScrollbar:SetContentHeight(grid:contentHeight()) end) -- reactive: sizes the thumb
+craftScrollbar.onChange = function(px) scroll:set(px) end                      -- scrollbar → signal
+```
+
+- Weave never references Craft: the scrollbar feeds `scroll` (position **in**), and
+  `grid:contentHeight()` is a **reactive read** the scrollbar binds to (total height
+  **out**). Same signal-or-literal / `applyOrBind` spirit as §4.1, one level in.
+- Omit `opts.scroll` and `virtual` creates its own signal and wires the mouse wheel —
+  good for a standalone panel without a Craft scrollbar.
+- **Do NOT nest it in a native `ScrollFrame`** that scrolls a giant child: that would
+  materialize thousands of frames — the exact thing virtualization avoids. The scroll
+  is a *position*, not a scrolled child.
+- The chrome (header, scrollbar) must be a **sibling** of the viewport, not a child:
+  `virtual` sets `SetClipsChildren(true)` on the container, so children outside the
+  viewport bounds get clipped.
+- Keying is positional (the window case); `render` is one homogeneous cell type in
+  Fase 1. Interleaved group headers (heterogeneous rows) land in a later release.
+- Create it inside the component's scope (§4.2) so it disposes with the instance.
+
 ## 5. Taint rules (WoW 12.0+ secret values)
 
 Weave is taint-aware end to end; components inherit that if they follow two rules:

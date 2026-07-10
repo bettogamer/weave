@@ -40,6 +40,8 @@ local function newFrame(frameType, name, parent, template)
   function f:SetSize(w, h) self._size = { w, h } end
   function f:SetPoint(...) self._points[#self._points + 1] = { ... } end
   function f:ClearAllPoints() self._points = {} end
+  function f:EnableMouseWheel(_) end -- no-op: virtual wires OnMouseWheel when it owns the scroll
+  function f:SetClipsChildren(v) self._clipsChildren = v end
   -- Regions: created THROUGH their parent, like the real client (f._regions
   -- records them in creation order; they reuse the same mock surface).
   f._regions = {}
@@ -149,6 +151,7 @@ local WOW_FILES = {
   "Weave/store/Store.lua",
   "Weave/ui/Ui.lua",
   "Weave/ui/Each.lua",
+  "Weave/ui/Virtual.lua",
 }
 
 --- Loads a FRESH Weave (core + wow) over the frame mock.

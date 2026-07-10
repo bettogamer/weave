@@ -4,6 +4,7 @@
 	<Script file="core\Core.lua"/>
 	<Script file="core\Reconcile.lua"/>
 	<Script file="core\Tween.lua"/>
+	<Script file="core\Window.lua"/>
 	<Script file="wow\Events.lua"/>
 	<Script file="wow\Props.lua"/>
 	<Script file="wow\Ticker.lua"/>
@@ -12,4 +13,5 @@
 	<Script file="store\Store.lua"/>
 	<Script file="ui\Ui.lua"/>
 	<Script file="ui\Each.lua"/>
+	<Script file="ui\Virtual.lua"/>
 </Ui>

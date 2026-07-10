@@ -116,6 +116,8 @@ function Weave.new(frameType, props)
         materializeRegion(frame, child._weaveRegion, child._props)
       elseif type(child) == "table" and child._weaveEach then
         Weave._materializeEach(frame, child) -- reactive list (ui/Each.lua)
+      elseif type(child) == "table" and child._weaveVirtual then
+        Weave._materializeVirtual(frame, child) -- virtualized grid (ui/Virtual.lua)
       elseif type(child) == "table" and child.SetParent then
         child:SetParent(frame) -- an already-created frame joins the tree
       else
