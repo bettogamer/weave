@@ -48,6 +48,20 @@
 > (4 INFO benignos). **VERIFICADO IN-GAME** (owner, 2026-07-07): `/weavepromise` OK (skeleton→item,
 > `bad`→rejected). **RELEASE v0.5.0 HECHO** (LibStub MINOR 6, changelog §10 v0.14, `dev`→`main`,
 > tag `v0.5.0`). Solo falta el `git push` del owner.
+>
+> **M10 Fase 1 COMPLETA + RELEASE v0.6.0 — `Weave.virtual` (grid virtualizado, ADR-0010)**: primitivo
+> hermano de `each` para listas de MILES (la lista de bolsas de Coffer, FR 2026-07-09). Motor de ventana
+> puro `core/Window.lua` (`_windowPlan`: pool fijo, scroll fraccional, grid por columnas, clamping) +
+> `ui/Virtual.lua` (pool fijo dimensionado al viewport, render 1 vez por celda, re-glaseo por scroll SIN
+> crear frames, grid, scroll señal externa/interna + rueda, `:contentHeight()` reactivo, `SetClipsChildren`
+> sobre el viewport, combat-safe, degradación taint). Scroll = **señal externa que el consumidor alimenta**
+> (patrón ADR-0006, espejo de la barra de Craft: posición hacia dentro, `contentHeight` hacia fuera). 25
+> tests (11 core + 14 ui), suite 260, luacheck 0/0, taintlint 0/0 (4 INFO benignos). Demo `/weavevirtual`
+> (grid 6-col sobre miles, rueda + barra arrastrable, `secret`→"??", combate solo re-glasea) **VERIFICADA
+> IN-GAME** (owner, 2026-07-09). Fix in-game: `SetClipsChildren` para que la fila extra del scroll
+> fraccional no se salga del panel. **Fase 2 (cabeceras heterogéneas — `opts.typeOf` + `render` por tipo,
+> pool por tipo) PENDIENTE** en release aparte. CRAFT-INTEGRATION §4.7. bump LibStub MINOR 7; tag `v0.6.0`
+> sobre main. Solo falta el `git push` del owner.
 > **Nivel de proceso: M** (subirá a L antes del primer release público, como craft).
 
 ## 1. Identidad del producto
@@ -189,3 +203,4 @@
 | v0.12 | 2026-07-05 | **FR Craft + RELEASE v0.3.0** (sin ADR, aditivo): predicados públicos `Weave.isReactive`/`Weave.isWritable` (core) para consumidores "señal-o-literal"; semántica estructural; `props._isCallable` delega en ellos (una sola definición). API-v0 §1 + CRAFT-INTEGRATION §4.1/§4.3/§6; 12 tests (192 total); bump LibStub MINOR 4; tag `v0.3.0` sobre main. |
 | v0.13 | 2026-07-06 | **M8 completo + RELEASE v0.4.0** (ADR-0008): `Weave.tween` (motor puro `core/Tween.lua` + driver compartido `wow/Anim.lua`, combat-safe, coste cero en reposo; número o array; `t:animating()` para coordinar entrada/salida). Endurecido contra re-entrancy en `onTick` (ping-pong). Demo `/weavetween` verificada in-game (fade+expand+hide vía `:animating()`, array tween). Quirk de render de WoW cazado (altura→0 no repinta al reabrir; §9). CRAFT-INTEGRATION §4.6; 219 tests; bump LibStub MINOR 5; tag `v0.4.0` sobre main. |
 | v0.14 | 2026-07-07 | **M9 completo + RELEASE v0.5.0** (ADR-0009): `Weave.fromPromise` — puente a las promesas de [Loom](../loom) (lib hermana async). Gemelo one-shot de `fromEvent`: señal read-only sembrada en centinela `Weave.pending`, rechazo → `Weave.rejected` + `opts.onError`, cancelación por `scope:dispose()` → `promise:cancel()` (cero leak). Consume SOLO la API pública de la promesa; Loom queda ignorante de Weave (dep unidireccional Weave→Loom, espejo de ADR-0006). `wow/Promise.lua` + 15 tests (promesa falsa = contrato público). Demo `/weavepromise` verificada in-game con **Loom v0.1.0 vendoreado READ-ONLY** en `demo/WeaveDemo/libs/Loom/`. API-v0 §2/§8/§9; 234 tests; bump LibStub MINOR 6; tag `v0.5.0` sobre main. |
+| v0.15 | 2026-07-09 | **M10 Fase 1 completa + RELEASE v0.6.0** (ADR-0010): `Weave.virtual` — grid virtualizado, hermano de `each` para listas de MILES (FR de Coffer). `core/Window.lua` puro (`_windowPlan`: pool fijo, scroll fraccional, grid por columnas, clamping) + `ui/Virtual.lua` (pool fijo dimensionado al viewport, render 1 vez por celda, re-glaseo por scroll SIN crear frames, columnas, scroll señal externa/interna + rueda, `:contentHeight()` reactivo, `SetClipsChildren` sobre el viewport, combat-safe, taint). Scroll = señal externa que el consumidor alimenta (patrón ADR-0006, espejo de la barra de Craft). Demo `/weavevirtual` verificada in-game (miles de filas, rueda + barra arrastrable, `secret`→"??", combate solo re-glasea). **Fase 2 (cabeceras heterogéneas) pendiente en release aparte.** API-v0 §4/§8/§9 + CRAFT-INTEGRATION §4.7; 25 tests (260 total); bump LibStub MINOR 7; tag `v0.6.0` sobre main. |

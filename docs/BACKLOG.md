@@ -14,7 +14,32 @@
 
 ## Solicitado desde el uso real (FR de consumidores)
 
-- _(ninguno abierto)_
+- **VIRTUALIZACIÓN/windowing + modo grid — para la lista de bolsas de Coffer**
+  (pedido 2026-07-09). Resuelto con un **primitivo hermano nuevo, `Weave.virtual`** (ADR-0010),
+  NO ampliando `each` — `each` queda para listas chicas/DragList. **Estado: Fase 1 ENTREGADA en
+  v0.6.0 (2026-07-09)** — requisitos 1/2/3/5 (ventana virtual + scroll fraccional + grid +
+  separación datos/render). **Fase 2 PENDIENTE**: requisito 4 (cabeceras de grupo intercaladas =
+  filas heterogéneas, `opts.typeOf` + `render` por tipo con pool por tipo) → release aparte.
+  El `each` v1 del ADR-0005 ("frame pooling combat-safe", un frame por
+  entrada, patrón WeakAuras/MRT) **no basta** para una lista de inventario de miles de ítems.
+  Requisitos concretos (fuente: Coffer `docs/UI-DESIGN.md` §8.1 y doc research 08 §2):
+  1. **Ventana virtual, no frame-por-entrada**: pool FIJO de N filas visibles reciclado sobre
+     un array de miles de entradas (no crear un frame por ítem). El pool recicla; jamás crea en
+     caliente; si se agota, degrada con aviso (mismo espíritu que los secrets).
+  2. **Scroll fraccional**: offsets por anchor (no salto de fila entera) para scroll suave.
+  3. **Modo grid**: N columnas por fila (no solo lista de 1 columna) — el grid de iconos de
+     bolsas. Nota: `Craft.Flex` no soporta wrap en `column`, así que el grid lo tiene que
+     resolver `each`, no el layout de Craft.
+  4. **Cabeceras de grupo intercaladas**: filas especiales (heading de categoría/grupo con
+     "(n)" y estado colapsado) mezcladas con filas de ítem en el mismo stream virtualizado.
+  5. **Datos separados del render**: la reconciliación/keying (Lua puro → `core/`, testeable
+     headless) separada del pooling/materialización (`ui/`) — conforme al ADR-0004. Coffer ya
+     diseña su lista manual con esta separación para migrar sin reescribir consumidores.
+  - **Estado en Coffer**: hoy lista manual (patrón `List.lua` de Sorted, señales solo en los
+    bordes); migra a `Weave.each` en cuanto el build etiquetado (v0.2.0 según ADR-0007) lo
+    entregue. No bloquea el M5 de Coffer.
+  - **Verificación esperada** (ya en ADR-0007): suite headless + demo in-game con lista dinámica
+    + ForceTaint + prueba EN combate.
 
 ## Cerrados
 
