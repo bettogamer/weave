@@ -13,8 +13,9 @@ globals = {
     -- APIs del juego usadas por la demo (demo/):
     "UnitHealth", "UnitHealthMax",
     "GetMoney", "GetCoinTextureString",
+    "GetCursorPosition",
     "SLASH_WEAVETAINT1", "SLASH_WEAVEWIDTH1", "SLASH_WEAVELIST1", "SLASH_WEAVETWEEN1",
-    "SLASH_WEAVEPROMISE1", "SlashCmdList",
+    "SLASH_WEAVEPROMISE1", "SLASH_WEAVEVIRTUAL1", "SlashCmdList",
 }
 
 ignore = {
