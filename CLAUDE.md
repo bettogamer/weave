@@ -133,9 +133,24 @@
   total), luacheck 0/0, taintlint 0/0. Demo `/weavevirtual` **VERIFICADA IN-GAME** (owner): miles de
   filas, rueda + barra arrastrable, `secret`→"??", combate solo re-glasea. Fix in-game: clip del
   viewport (la fila extra del scroll fraccional se salía). Docs: ADR-0010, API-v0 §4/§8/§9,
-  CRAFT-INTEGRATION §4.7. bump LibStub MINOR 7, changelog §10 v0.15, tag `v0.6.0` sobre main
-  (pendiente `git push` del owner). **Fase 2 (cabeceras heterogéneas: `opts.typeOf` + `render` por
-  tipo, pool por tipo) PENDIENTE — release aparte.**
+  CRAFT-INTEGRATION §4.7. bump LibStub MINOR 7, changelog §10 v0.15, tag `v0.6.0` sobre main.
+- **M10 Fase 2 COMPLETA + RELEASE v0.7.0 — filas heterogéneas** (2026-07-09, ADR-0010): `Weave.virtual`
+  gana el modo heterogéneo `opts.typeOf` + `opts.types = { [tipo] = { render, height, grid? } }`:
+  ítems `grid=true` fluyen en las N columnas; los tipos sin `grid` van a ancho completo (fila propia,
+  `virtual` les fija width+height) y **rompen el flujo**. **Pool POR TIPO**. Planificador puro nuevo
+  `core/Flow.lua` (`_flowLayout` = filas visuales por cambio de datos + `_flowVisible` = búsqueda
+  binaria por scroll). **El colapso lo posee el consumidor** (decisión del owner): el stream es un
+  `computed` sobre una señal de grupos cerrados; `virtual` no sabe qué es un grupo. `render`(fn) y
+  `types` excluyentes. 21 tests (281 total), luacheck 0/0, taintlint 0/0. Demo `/weavegroups`
+  **VERIFICADA IN-GAME** (owner): cabeceras colapsables + grid + barra arrastrable. Bug cazado in-game:
+  `virtual` no fijaba la ALTURA de las filas de ancho completo → cabeceras invisibles (altura 0);
+  arreglado. Caso documentado: el consumidor re-clampa SU señal de scroll al encoger el contenido
+  (`virtual` solo la lee, ADR-0006) — patrón en CRAFT-INTEGRATION §4.7 + ambas demos. bump LibStub
+  MINOR 8, changelog §10 v0.16, tag `v0.7.0` sobre main (pendiente `git push`). **FR de Coffer CERRADO
+  por completo; M10 CERRADO.** Nota de norte (owner preguntó): `virtual` NO es primitivo de core en
+  Fusion/Solid (allí la virtualización es userland, p.ej. TanStack Virtual); en Weave va en `ui/`
+  (adoptable), construido solo sobre signal/computed/effect — el core reactivo intacto; batteries-
+  included porque WoW no tiene ecosistema de libs compañeras y debe ser WoW-aware. Sin desviación.
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
