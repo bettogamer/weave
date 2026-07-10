@@ -100,6 +100,13 @@ local function clampScroll(s)
   return s
 end
 
+-- If the list shrinks below the current scroll, keep our (consumer-owned) scroll signal
+-- in range — virtual clamps its painting but only READS scroll (ADR-0006).
+W.effect(function()
+  local maxS = math.max(0, v:contentHeight() - VIEWH)
+  if scroll:peek() > maxS then scroll:set(maxS) end
+end)
+
 -- The wheel scrolls the viewport (delta -1 = down = later items).
 viewport:EnableMouseWheel(true)
 viewport:SetScript("OnMouseWheel", function(_, delta)

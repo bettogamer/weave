@@ -13,3 +13,4 @@ EachDemo.lua
 TweenDemo.lua
 PromiseDemo.lua
 VirtualDemo.lua
+VirtualGroupsDemo.lua
