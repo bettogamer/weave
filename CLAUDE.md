@@ -123,6 +123,19 @@
   - **RELEASE v0.5.0 HECHO** (2026-07-07): bump `.toc` Version + `Weave.lua` LibStub MINOR 6 + `_VERSION`,
     fila changelog §10 v0.14, commits (feat wow + feat demo + chore release), `dev` mergeado a `main`,
     tag `v0.5.0` sobre main. **`git push` lo hace el owner a mano** (regla del repo; Claude no pushea).
+- **M10 Fase 1 COMPLETA + RELEASE v0.6.0 — `Weave.virtual`** (2026-07-09, ADR-0010): grid
+  virtualizado, primitivo HERMANO de `each` (no se amplió `each`) para la lista de bolsas de Coffer
+  (FR). `core/Window.lua` puro (`_windowPlan`: pool fijo, scroll fraccional, grid, clamping) +
+  `ui/Virtual.lua` (pool fijo al viewport, render 1 vez por celda, re-glaseo por scroll SIN crear
+  frames, columnas, scroll señal externa/interna + rueda, `:contentHeight()` reactivo,
+  `SetClipsChildren` sobre el viewport, combat-safe, taint). Scroll = señal externa que el consumidor
+  alimenta (patrón ADR-0006 = barra de Craft: posición dentro, `contentHeight` fuera). 25 tests (260
+  total), luacheck 0/0, taintlint 0/0. Demo `/weavevirtual` **VERIFICADA IN-GAME** (owner): miles de
+  filas, rueda + barra arrastrable, `secret`→"??", combate solo re-glasea. Fix in-game: clip del
+  viewport (la fila extra del scroll fraccional se salía). Docs: ADR-0010, API-v0 §4/§8/§9,
+  CRAFT-INTEGRATION §4.7. bump LibStub MINOR 7, changelog §10 v0.15, tag `v0.6.0` sobre main
+  (pendiente `git push` del owner). **Fase 2 (cabeceras heterogéneas: `opts.typeOf` + `render` por
+  tipo, pool por tipo) PENDIENTE — release aparte.**
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
