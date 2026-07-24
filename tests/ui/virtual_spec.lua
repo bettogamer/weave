@@ -146,6 +146,56 @@ describe("Weave.virtual: grid (N columnas)", function()
 
 end)
 
+describe("Weave.virtual: padding (inset — no afeitar fila/columna 0 con el clip, FR Coffer)", function()
+
+  it("desplaza el origen del grid por padding y encoge colWidth simétricamente", function()
+    local W = helper.loadWeaveWow()
+    -- viewport 240×80, 6 columnas, padding 6 → colWidth (240-12)/6 = 38
+    local box = W.new("Frame", { size = { 240, 80 } })
+    W.virtual(seq(100), {
+      parent = box, viewport = { 240, 80 }, rowHeight = 40, columns = 6, padding = 6,
+      render = numberRow(W),
+    })
+    local e1, e2 = box._virtualRows[1], box._virtualRows[2]
+    assert_eq(lastPoint(e1)[4], 6,  "columna 0 arranca en padH, no en 0 (ya no flush con el clip)")
+    assert_eq(lastPoint(e1)[5], -6, "fila 0 arranca padV por debajo del tope")
+    assert_eq(lastPoint(e2)[4], 44, "columna 1 = padH + colWidth (6 + 38)")
+  end)
+
+  it("paddingH/paddingV pisan el escalar por eje", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 240, 80 } })
+    W.virtual(seq(100), {
+      parent = box, viewport = { 240, 80 }, rowHeight = 40, columns = 6,
+      padding = 6, paddingH = 10, paddingV = 0, render = numberRow(W),
+    })
+    local e1 = box._virtualRows[1]
+    assert_eq(lastPoint(e1)[4], 10, "paddingH pisa el escalar")
+    assert_eq(lastPoint(e1)[5], 0,  "paddingV 0 pisa el escalar (fila pegada al tope)")
+  end)
+
+  it("padding crece contentHeight en padTop+padBottom", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 80, 100 } })
+    -- 100 filas × 20 = 2000; +padV 8 arriba + 8 abajo = 2016
+    local v = W.virtual(seq(100), {
+      parent = box, viewport = { 80, 100 }, rowHeight = 20, padding = 8, render = numberRow(W),
+    })
+    assert_eq(v:contentHeight(), 2016)
+  end)
+
+  it("padding horizontal que no deja hueco para columnas → error claro", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 80, 100 } })
+    assert_error(function()
+      W.virtual(seq(10), {
+        parent = box, viewport = { 80, 100 }, rowHeight = 20, padding = 40, render = numberRow(W),
+      })
+    end, "no room")
+  end)
+
+end)
+
 describe("Weave.virtual: contentHeight (para la barra de Craft)", function()
 
   it("expone el alto total de la lista completa, reactivo al tamaño de la fuente", function()

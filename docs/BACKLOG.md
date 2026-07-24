@@ -14,9 +14,22 @@
 
 ## Solicitado desde el uso real (FR de consumidores)
 
-- _(ninguno abierto)_
+_(vacío — ver Cerrados)_
 
 ## Cerrados
+
+- **`Weave.virtual`: padding — no afeitar la primera fila/columna con el clip** — ✅ **CERRADO
+  2026-07-23** (pedido por **Coffer 2026-07-23**, grid de bolsas/banco). Síntoma: la celda de la
+  **columna 0** (y la fila 0) perdía **1px** por quedar flush contra el borde del `SetClipsChildren`
+  del viewport, con `effectiveScale` no-entero. **Resuelto** con `opts.padding` (escalar, 4 lados) +
+  overrides `opts.paddingH` / `opts.paddingV` (decisión del owner sobre la forma de API). Inset
+  **simétrico**: el horizontal encoge `colWidth` a `(viewport_w − 2·padH)/columns`; el vertical crece
+  `contentHeight` en `padTop+padBottom`. La geometría vive en el core puro (`Weave._windowPlan` y
+  `Weave._flowLayout` ganan `padTop`/`padBottom`); el ui aplica el offset X y encoge `colWidth`.
+  Default 0 → cero cambio de comportamiento. Cubre grid homogéneo (Fase 1) y cabeceras de ancho
+  completo (Fase 2, se insetan también). Tests: +13 (window/flow/virtual/virtual_hetero specs), suite
+  **294** verde, luacheck 0/0, taintlint 0/0/0. Demo `/weavevirtual` con `padding = 4`. Docs: API-v0
+  §4. **Pendiente del owner**: verificar in-game y re-vendorear el build en Coffer.
 
 - **VIRTUALIZACIÓN/windowing + modo grid + cabeceras — lista de bolsas de Coffer** — ✅ **CERRADO
   2026-07-09** (pedido 2026-07-09, ADR-0010). Resuelto con un **primitivo hermano nuevo,

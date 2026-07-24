@@ -54,6 +54,23 @@ describe("Weave.virtual Fase 2: filas heterogéneas", function()
     assert_eq(lastPoint(i2)[5], -10)
   end)
 
+  it("padding insetea cabeceras (ancho completo) e ítems del grid por igual (FR Coffer)", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    -- columns 3, padding 6 → colWidth (60-12)/3 = 16; cabecera ancho completo = 60-12 = 48
+    W.virtual({ H(1), I(1), I(2) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3, padding = 6,
+      typeOf = typeOf, types = htypes(W),
+    })
+    local h1, i1, i2 = box._virtualRows[1], box._virtualRows[2], box._virtualRows[3]
+    assert_eq(lastPoint(h1)[4], 6, "la cabecera arranca en padH, no en 0")
+    assert_eq(h1._set.width, 48, "ancho completo menos el inset horizontal")
+    assert_eq(lastPoint(h1)[5], -6, "la cabecera arranca padV por debajo del tope")
+    assert_eq(lastPoint(i1)[4], 6, "ítem col 0 en padH")
+    assert_eq(lastPoint(i1)[5], -16, "ítem bajo la cabecera: padV(6) + altura cabecera(10)")
+    assert_eq(lastPoint(i2)[4], 22, "ítem col 1 = padH + colWidth (6 + 16)")
+  end)
+
   it("pool POR TIPO: crecer el stream no crea frames nuevos", function()
     local W = helper.loadWeaveWow()
     local source = W.signal({ H(1), I(1) })

@@ -377,6 +377,16 @@ W.new("Frame", {
 - **Grid (`opts.columns`):** `columns = N` coloca la entrada `i` en `(fila = i//N, col = i%N)`.
   `columns = 1` (default) es lista de una columna. El wrap lo resuelve `virtual` (no depende del
   layout de Craft).
+- **Padding (`opts.padding` / `paddingH` / `paddingV`, FR Coffer):** inset **simétrico** del
+  contenido dentro del viewport. `padding` es el escalar para los 4 lados; `paddingH`/`paddingV`
+  pisan por eje. El horizontal **encoge `colWidth`** a `(viewport_w − 2·padH) / columns` (la última
+  columna tampoco queda flush a la derecha); el vertical **crece `contentHeight`** en
+  `padTop+padBottom` (se puede scrollear hasta ver el margen inferior). Motivo: `virtual` hace
+  `SetClipsChildren` sobre el viewport y ancla la celda 0 al `TOPLEFT` del propio contenedor que
+  recorta → sin inset, con `effectiveScale` no-entero la rasterización se come 1px del borde
+  izquierdo/superior de la fila/columna 0. El consumidor no puede corregirlo desde fuera (por eso es
+  opción de `virtual`, no cromo externo). Default 0 → sin cambio de comportamiento. Aplica igual a
+  las cabeceras de ancho completo de Fase 2 (se insetan también en horizontal).
 - **Scroll = señal externa (integración Craft, ADR-0006):** `opts.scroll` es una señal que
   **trae el consumidor** (la barra de scroll de Craft la mueve); `virtual` solo la lee.
   `virtual:contentHeight()` es un computed que `virtual` **expone** con el alto total de la

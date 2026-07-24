@@ -126,3 +126,50 @@ describe("Weave._windowPlan: planificador de ventana puro (virtualización)", fu
   end)
 
 end)
+
+describe("Weave._windowPlan: padding vertical (inset del contenido — FR Coffer)", function()
+
+  it("padTop/padBottom crecen contentHeight y maxScroll en padTop+padBottom", function()
+    local W = helper.loadWeave()
+    -- 10 filas de 20 = 200 de filas; +padTop 8 +padBottom 8 = 216; viewport 100 → maxScroll 116
+    local p = W._windowPlan(10, { rowHeight = 20, viewportHeight = 100, padTop = 8, padBottom = 8 })
+    assert_eq(p.contentHeight, 216)
+    assert_eq(p.maxScroll, 116)
+  end)
+
+  it("scroll 0 con padTop: la fila 0 arranca padTop por debajo del tope (offset negativo)", function()
+    local W = helper.loadWeave()
+    local p = W._windowPlan(10, { rowHeight = 20, viewportHeight = 100, padTop = 8 })
+    assert_eq(p.firstRow, 0)
+    assert_eq(p.first, 1)
+    assert_eq(p.offset, -8, "offset negativo = la fila baja padTop px, ya no flush con el clip")
+  end)
+
+  it("scroll dentro del padTop: sigue en la fila 0, offset negativo más chico", function()
+    local W = helper.loadWeave()
+    -- 3px de scroll consumidos dentro de los 8 de margen → offset -5, aún fila 0
+    local p = W._windowPlan(10, { rowHeight = 20, viewportHeight = 100, padTop = 8, scroll = 3 })
+    assert_eq(p.firstRow, 0)
+    assert_eq(p.offset, -5)
+    assert_eq(p.first, 1)
+  end)
+
+  it("scroll pasado el padTop: fila y offset se calculan sobre (scroll - padTop)", function()
+    local W = helper.loadWeave()
+    -- stride 20, padTop 8, scroll 30 → top = 22 → firstRow 1, offset 2, first 2
+    local p = W._windowPlan(10, { rowHeight = 20, viewportHeight = 100, padTop = 8, scroll = 30 })
+    assert_eq(p.firstRow, 1)
+    assert_eq(p.offset, 2)
+    assert_eq(p.first, 2)
+  end)
+
+  it("sin padding (default 0): idéntico al comportamiento previo", function()
+    local W = helper.loadWeave()
+    local a = W._windowPlan(100, { rowHeight = 20, viewportHeight = 100, scroll = 50 })
+    local b = W._windowPlan(100, { rowHeight = 20, viewportHeight = 100, scroll = 50, padTop = 0, padBottom = 0 })
+    assert_eq(a.offset, b.offset)
+    assert_eq(a.firstRow, b.firstRow)
+    assert_eq(a.contentHeight, b.contentHeight)
+  end)
+
+end)

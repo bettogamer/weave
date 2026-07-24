@@ -77,6 +77,7 @@ function VirtualMethods:_window()
   local plan = Weave._windowPlan(#list, {
     rowHeight = self._rowHeight, viewportHeight = self._viewportH,
     scroll = self._scrollGet(), columns = self._columns, spacing = self._spacing,
+    padTop = self._padV, padBottom = self._padV,
   })
   self._contentHeight:set(plan.contentHeight)
   self._maxScroll = plan.maxScroll
@@ -92,7 +93,7 @@ function VirtualMethods:_window()
       row._weaveIndex:set(idx)
       row:ClearAllPoints()
       row:SetPoint("TOPLEFT", self._container, "TOPLEFT",
-        col * self._colWidth, plan.offset - (r - plan.firstRow) * self._stride)
+        self._padH + col * self._colWidth, plan.offset - (r - plan.firstRow) * self._stride)
       row:Show()
       visible[p] = row
     else
@@ -141,7 +142,10 @@ function VirtualMethods:_rebuildLayout(list)
     desc[i] = { grid = spec.grid or false, height = spec.height }
     entryType[i] = t
   end
-  self._layout = Weave._flowLayout(desc, { columns = self._columns, spacing = self._spacing })
+  self._layout = Weave._flowLayout(desc, {
+    columns = self._columns, spacing = self._spacing,
+    padTop = self._padV, padBottom = self._padV,
+  })
   self._entryType = entryType
   self._contentHeight:set(self._layout.contentHeight)
 end
@@ -171,10 +175,10 @@ function VirtualMethods:_paintHetero()
         frame._weaveItem:set(list[j])
         frame._weaveIndex:set(j)
         frame:ClearAllPoints()
-        local x = grid and (j - row.first) * self._colWidth or 0
+        local x = self._padH + (grid and (j - row.first) * self._colWidth or 0)
         frame:SetPoint("TOPLEFT", self._container, "TOPLEFT", x, scroll - row.y)
         if not grid then -- full-width row: virtual owns its size (the layout's authority)
-          frame:SetWidth(self._viewportW)
+          frame:SetWidth(self._viewportW - 2 * self._padH)
           frame:SetHeight(self._types[t].height)
         end
         frame:Show()
@@ -226,13 +230,21 @@ function Weave._materializeVirtual(container, d)
   local source   = d._source
   local viewport = opts.viewport
 
+  -- Padding (FR Coffer 2026-07-23): opts.padding is the scalar for all four sides;
+  -- opts.paddingH / opts.paddingV override per axis. Symmetric inset — horizontal
+  -- shrinks colWidth so the last column is not flush with the clip either.
+  local padH = opts.paddingH or opts.padding or 0
+  local padV = opts.paddingV or opts.padding or 0
+
   local inst = setmetatable({
     _container     = container,
     _spacing       = opts.spacing or 0,
     _columns       = opts.columns or 1,
+    _padH          = padH,
+    _padV          = padV,
     _viewportW     = viewport[1],
     _viewportH     = viewport[2],
-    _colWidth      = viewport[1] / (opts.columns or 1),
+    _colWidth      = (viewport[1] - 2 * padH) / (opts.columns or 1),
     _contentHeight = Weave.signal(0),
     _maxScroll     = 0,
     _scope         = Weave.scope(),
@@ -325,6 +337,16 @@ function Weave.virtual(source, opts)
   end
   if opts.columns ~= nil and (type(opts.columns) ~= "number" or opts.columns < 1) then
     error("Weave.virtual: opts.columns must be a number >= 1", 2)
+  end
+  for _, k in ipairs({ "padding", "paddingH", "paddingV" }) do
+    if opts[k] ~= nil and (type(opts[k]) ~= "number" or opts[k] < 0) then
+      error("Weave.virtual: opts." .. k .. " must be a number >= 0", 2)
+    end
+  end
+  local padH = opts.paddingH or opts.padding or 0
+  if 2 * padH >= opts.viewport[1] then
+    error("Weave.virtual: horizontal padding (" .. padH .. ") leaves no room in viewport "
+      .. "width " .. opts.viewport[1], 2)
   end
 
   local descriptor = { _weaveVirtual = true, _source = source, _opts = opts }
