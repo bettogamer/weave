@@ -29,7 +29,8 @@ _(vacío — ver Cerrados)_
   Default 0 → cero cambio de comportamiento. Cubre grid homogéneo (Fase 1) y cabeceras de ancho
   completo (Fase 2, se insetan también). Tests: +13 (window/flow/virtual/virtual_hetero specs), suite
   **294** verde, luacheck 0/0, taintlint 0/0/0. Demo `/weavevirtual` con `padding = 4`. Docs: API-v0
-  §4. **Pendiente del owner**: verificar in-game y re-vendorear el build en Coffer.
+  §4. **Verificado in-game** por el owner (2026-07-23): grid insetado, sin afeitado en col 0 / fila 0.
+  **Pendiente del owner**: re-vendorear el build v0.8.0 en Coffer y migrar su grid a `opts.padding`.
 
 - **VIRTUALIZACIÓN/windowing + modo grid + cabeceras — lista de bolsas de Coffer** — ✅ **CERRADO
   2026-07-09** (pedido 2026-07-09, ADR-0010). Resuelto con un **primitivo hermano nuevo,

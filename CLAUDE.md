@@ -165,8 +165,9 @@
   comportamiento (toda la suite previa verde). 13 tests nuevos (window/flow/virtual/virtual_hetero),
   suite **294** verde, luacheck 0/0, taintlint 0/0/0. Demo `/weavevirtual` con `padding = 4`. Docs:
   API-v0 §4, BACKLOG (FR cerrado), changelog §10 v0.17. bump `.toc` 0.8.0 + LibStub MINOR 9 + `_VERSION`,
-  `dev` mergeado a `main`, tag `v0.8.0` sobre main. **`git push` lo hace el owner.** _Verificación
-  in-game pendiente del owner (el grid debe verse separado ~padding del borde, sin afeitado en col 0)._
+  `dev` mergeado a `main`, tag `v0.8.0` sobre main. **`git push` lo hace el owner.** **VERIFICADO
+  IN-GAME** por el owner (2026-07-23): `/weavevirtual` OK — el grid se ve insetado, sin afeitado en
+  columna 0 / fila 0. Pendiente del owner: re-vendorear el build v0.8.0 en Coffer y migrar su grid.
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
