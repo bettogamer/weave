@@ -13,10 +13,17 @@ local floor = math.floor
 -- items[i] = { grid = boolean, height = number }. Consecutive grid entries pack into a
 -- visual row of up to `columns` (sharing the row's max height); a full-width entry gets
 -- its own row and flushes any open grid row. Returns { rows, contentHeight }.
+--
+-- padTop/padBottom inset the stream vertically (FR Coffer 2026-07-23): every row's y is
+-- shifted down by padTop and contentHeight grows by padTop+padBottom, so the first row is
+-- never flush with the viewport clip. _flowVisible needs no change — it works in the same
+-- (already shifted) content space the ui scrolls over.
 function Weave._flowLayout(items, opts)
   local columns = opts.columns or 1
   local spacing = opts.spacing or 0
-  local rows, y, n, i = {}, 0, #items, 1
+  local padTop  = opts.padTop or 0
+  local padBot  = opts.padBottom or 0
+  local rows, y, n, i = {}, padTop, #items, 1
 
   while i <= n do
     if items[i].grid then
@@ -36,7 +43,7 @@ function Weave._flowLayout(items, opts)
     end
   end
 
-  local contentHeight = #rows > 0 and (y - spacing) or 0
+  local contentHeight = #rows > 0 and (y - spacing + padBot) or 0
   return { rows = rows, contentHeight = contentHeight }
 end
 

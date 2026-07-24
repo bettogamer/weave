@@ -151,6 +151,22 @@
   Fusion/Solid (allí la virtualización es userland, p.ej. TanStack Virtual); en Weave va en `ui/`
   (adoptable), construido solo sobre signal/computed/effect — el core reactivo intacto; batteries-
   included porque WoW no tiene ecosistema de libs compañeras y debe ser WoW-aware. Sin desviación.
+- **FR Coffer + RELEASE v0.8.0 — `Weave.virtual` padding** (2026-07-23, sin ADR — aditivo): pedido por
+  Coffer (grid de bolsas). Síntoma: la fila/columna 0 perdía 1px afeitada por el `SetClipsChildren` del
+  viewport (con `effectiveScale` no-entero, el clip cae a media-pixel). El consumidor no podía
+  corregirlo (la celda 0 se ancla al `TOPLEFT` del propio container que recorta). Entregado: `opts.padding`
+  (escalar, 4 lados) + overrides `opts.paddingH` / `opts.paddingV` (**forma de API elegida por el owner**).
+  Inset **simétrico**: horizontal encoge `colWidth` a `(viewport_w − 2·padH)/columns`; vertical crece
+  `contentHeight` en `padTop+padBottom`. La geometría vive en el **core puro**: `core/Window.lua`
+  (`_windowPlan`) y `core/Flow.lua` (`_flowLayout`) ganan `padTop`/`padBottom` (ventana sobre
+  `scroll − padTop`, offset negativo dentro del margen superior); el ui aplica offset X y encoge
+  `colWidth`. Cabeceras de ancho completo (Fase 2) se insetan también en horizontal (**decisión del
+  owner** ante pregunta explícita: alineadas con los ítems, no full-bleed). Default 0 → cero cambio de
+  comportamiento (toda la suite previa verde). 13 tests nuevos (window/flow/virtual/virtual_hetero),
+  suite **294** verde, luacheck 0/0, taintlint 0/0/0. Demo `/weavevirtual` con `padding = 4`. Docs:
+  API-v0 §4, BACKLOG (FR cerrado), changelog §10 v0.17. bump `.toc` 0.8.0 + LibStub MINOR 9 + `_VERSION`,
+  `dev` mergeado a `main`, tag `v0.8.0` sobre main. **`git push` lo hace el owner.** _Verificación
+  in-game pendiente del owner (el grid debe verse separado ~padding del borde, sin afeitado en col 0)._
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a

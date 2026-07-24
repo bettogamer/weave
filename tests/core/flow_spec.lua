@@ -92,6 +92,20 @@ describe("Weave._flowLayout: filas visuales de un stream heterogéneo", function
     assert_eq(L.contentHeight, 0)
   end)
 
+  it("padding vertical: desplaza todas las filas por padTop y crece contentHeight", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ item(40), item(40) }, { columns = 1, padTop = 6, padBottom = 6 })
+    assert_eq(L.rows[1].y, 6, "la primera fila arranca en padTop, no en 0")
+    assert_eq(L.rows[2].y, 46)
+    assert_eq(L.contentHeight, 92, "40*2 + 6 + 6")
+  end)
+
+  it("padding en stream vacío: contentHeight sigue 0 (nada que insetar)", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({}, { columns = 6, padTop = 6, padBottom = 6 })
+    assert_eq(L.contentHeight, 0)
+  end)
+
 end)
 
 describe("Weave._flowVisible: rango de filas visuales visibles (por scroll)", function()
@@ -138,6 +152,15 @@ describe("Weave._flowVisible: rango de filas visuales visibles (por scroll)", fu
     local W = helper.loadWeave()
     local vis = W._flowVisible(W._flowLayout({}, { columns = 6 }), 0, 100)
     assert_true(vis.first > vis.last, "sin filas, nada visible")
+  end)
+
+  it("con padding: _flowVisible trabaja en el mismo espacio ya desplazado", function()
+    local W = helper.loadWeave()
+    -- 3 ítems de 20 con padTop 10 → filas en y = 10, 30, 50; contentHeight 80
+    local L = W._flowLayout({ item(20), item(20), item(20) }, { columns = 1, padTop = 10, padBottom = 10 })
+    local vis = W._flowVisible(L, 0, 40)
+    assert_eq(vis.first, 1, "la fila en [10,30) asoma en el viewport [0,40)")
+    assert_eq(vis.last, 2, "la fila en [30,50) toca; la de [50,70) no")
   end)
 
 end)

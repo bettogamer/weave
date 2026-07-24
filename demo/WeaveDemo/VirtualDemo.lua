@@ -91,6 +91,7 @@ local viewport = W.new("Frame", {
 -- binds to it). virtual only READS `scroll`; we own it, like Craft owns its scrollbar.
 local v = W.virtual(items, {
   parent = viewport, viewport = { VIEWW, VIEWH }, rowHeight = ROWH, columns = COLS,
+  padding = 4, -- inset the grid so col 0 / row 0 aren't flush with the clip (FR Coffer)
   scroll = scroll, render = renderCell,
 })
 
