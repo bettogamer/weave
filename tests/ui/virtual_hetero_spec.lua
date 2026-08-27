@@ -172,3 +172,150 @@ describe("Weave.virtual Fase 2: validación y combate", function()
   end)
 
 end)
+
+-- Un stream con nivel: I2(k) es un ítem que cuelga 20px de su sub-cabecera H2(k).
+local function I2(k) return { kind = "item", k = k, depth = 1 } end
+local function H2(k) return { kind = "header", k = k, depth = 1 } end
+local function indentOf(e) return (e.depth or 0) * 20 end
+
+describe("Weave.virtual Fase 2: sangría por fila (FR Coffer 2026-08-26)", function()
+
+  -- viewport 60 de ancho, 3 columnas → colWidth 20. Una tanda sangrada 20px solo
+  -- tiene 40px útiles → 2 columnas, con las celdas midiendo LO MISMO (20).
+  it("desplaza la x de las celdas y reduce las columnas de esa tanda", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    W.virtual({ I(1), I(2), I(3), I2(4), I2(5), I2(6) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3,
+      typeOf = typeOf, indentOf = indentOf, types = htypes(W),
+    })
+    local r = box._virtualRows
+    assert_eq(lastPoint(r[1])[4], 0);  assert_eq(lastPoint(r[2])[4], 20)
+    assert_eq(lastPoint(r[3])[4], 40, "la sección madre llena las 3 columnas")
+    assert_eq(lastPoint(r[4])[4], 20, "la tanda sangrada arranca en la sangría")
+    assert_eq(lastPoint(r[5])[4], 40)
+    assert_eq(lastPoint(r[6])[4], 20, "solo caben 2: el tercero baja de fila")
+    assert_eq(lastPoint(r[6])[5], -40, "y ocupa una fila visual nueva (y = 40)")
+  end)
+
+  it("las celdas sangradas MIDEN lo mismo que las de la sección madre", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    W.virtual({ I(1), I(2), I2(3), I2(4) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3,
+      typeOf = typeOf, indentOf = indentOf, types = htypes(W),
+    })
+    local r = box._virtualRows
+    local stepTop = lastPoint(r[2])[4] - lastPoint(r[1])[4]
+    local stepSub = lastPoint(r[4])[4] - lastPoint(r[3])[4]
+    assert_eq(stepSub, stepTop, "mismo paso de columna = misma celda, solo movida")
+  end)
+
+  it("una sub-cabecera de ancho completo se inseta Y encoge", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    W.virtual({ H2(1), I2(1) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3,
+      typeOf = typeOf, indentOf = indentOf, types = htypes(W),
+    })
+    local h = box._virtualRows[1]
+    assert_eq(lastPoint(h)[4], 20, "cuelga de la sangría, como sus ítems")
+    assert_eq(h._set.width, 40, "y su ancho se recorta para no salirse del viewport")
+  end)
+
+  it("sin indentOf, el layout es EXACTAMENTE el de antes", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    W.virtual({ H(1), I(1), I(2), I(3) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3, typeOf = typeOf, types = htypes(W),
+    })
+    local r = box._virtualRows
+    assert_eq(lastPoint(r[2])[4], 0); assert_eq(lastPoint(r[3])[4], 20)
+    assert_eq(lastPoint(r[4])[4], 40)
+  end)
+
+  it("indentOf exige el modo heterogéneo (types)", function()
+    local W = helper.loadWeaveWow()
+    assert_error(function()
+      W.virtual({ 1, 2, 3, 4 }, {
+        parent = W.new("Frame", { size = { 60, 100 } }), viewport = { 60, 100 },
+        rowHeight = 20, render = function() end, indentOf = indentOf,
+      })
+    end, "indentOf")
+  end)
+
+  it("indentOf debe ser una función y devolver un número >= 0", function()
+    local W = helper.loadWeaveWow()
+    assert_error(function()
+      W.virtual({ I(1) }, {
+        parent = W.new("Frame", { size = { 60, 100 } }), viewport = { 60, 100 },
+        columns = 3, typeOf = typeOf, types = htypes(W), indentOf = 20,
+      })
+    end, "indentOf")
+    assert_error(function()
+      W.virtual({ I(1) }, {
+        parent = W.new("Frame", { size = { 60, 100 } }), viewport = { 60, 100 },
+        columns = 3, typeOf = typeOf, types = htypes(W),
+        indentOf = function() return -5 end,
+      })
+    end, "indentOf")
+  end)
+
+end)
+
+describe("Weave.virtual Fase 2: Resize (FR Coffer 2026-08-27)", function()
+
+  it("Resize{ height } re-ventana el stream sin recrear la lista", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 40 } })
+    -- viewport 40 de alto, ítems de 20 en 1 columna → asoman 3 filas (2 + la fraccional)
+    local stream = {}
+    for i = 1, 20 do stream[i] = I(i) end
+    local inst = W.virtual(stream, {
+      parent = box, viewport = { 60, 40 }, columns = 1, typeOf = typeOf, types = htypes(W),
+    })
+    local shown = #box._virtualRows
+    inst:Resize({ height = 100 })
+    assert_true(#box._virtualRows > shown, "más alto = más filas del stream a la vista")
+    assert_eq(box._virtualRows[1]._set.text, "i1", "y sigue siendo la misma lista")
+  end)
+
+  it("Resize{ columns } re-empaqueta el flujo y re-ancha las celdas", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    local inst = W.virtual({ I(1), I(2), I(3) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3, typeOf = typeOf, types = htypes(W),
+    })
+    assert_eq(lastPoint(box._virtualRows[2])[4], 20, "3 columnas → colWidth 20")
+    inst:Resize({ columns = 2 })
+    local r = box._virtualRows
+    assert_eq(lastPoint(r[2])[4], 30, "2 columnas → colWidth 30")
+    assert_eq(lastPoint(r[3])[4], 0,  "el tercero baja a una fila nueva")
+    assert_eq(lastPoint(r[3])[5], -20)
+  end)
+
+  it("Resize{ width } re-ancha las filas de ancho completo", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    local inst = W.virtual({ H(1), I(1) }, {
+      parent = box, viewport = { 60, 100 }, columns = 3, typeOf = typeOf, types = htypes(W),
+    })
+    assert_eq(box._virtualRows[1]._set.width, 60)
+    inst:Resize({ width = 90 })
+    assert_eq(box._virtualRows[1]._set.width, 90, "la cabecera sigue al viewport")
+  end)
+
+  it("crecer añade frames al pool DEL TIPO que los necesita", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 40 } })
+    local stream = {}
+    for i = 1, 20 do stream[i] = I(i) end
+    local inst = W.virtual(stream, {
+      parent = box, viewport = { 60, 40 }, columns = 1, typeOf = typeOf, types = htypes(W),
+    })
+    local before = helper.frameCount()
+    inst:Resize({ height = 200 })
+    assert_true(helper.frameCount() > before, "el pool crece con el viewport")
+  end)
+
+end)

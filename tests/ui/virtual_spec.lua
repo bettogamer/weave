@@ -304,3 +304,160 @@ describe("Weave.virtual: scopes", function()
   end)
 
 end)
+
+local function capturePrints(fn)
+  local lines, realPrint = {}, print
+  _G.print = function(...) lines[#lines + 1] = table.concat({ ... }, " ") end
+  local ok, err = pcall(fn)
+  _G.print = realPrint
+  if not ok then error(err, 0) end
+  return lines
+end
+
+-- Una lista viva de 80x100 con rowHeight 20 → pool de ceil(100/20)+1 = 6 filas.
+local function grid(W, opts)
+  local box = W.new("Frame", { size = { 80, 100 } })
+  local o = {
+    parent = box, viewport = { 80, 100 }, rowHeight = 20, render = numberRow(W),
+  }
+  for k, v in pairs(opts or {}) do o[k] = v end
+  return box, W.virtual(seq(100), o)
+end
+
+describe("Weave.virtual: Resize — viewport y columnas mutables (FR Coffer 2026-08-27)", function()
+
+  it("Resize{ height } re-ventana: más alto = más filas, y el pool crece con él", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    assert_eq(#box._virtualRows, 6)
+    local before = helper.frameCount()
+    inst:Resize({ height = 200 })
+    assert_eq(#box._virtualRows, 11, "ceil(200/20)+1 = 11 filas")
+    assert_eq(helper.frameCount() - before, 5, "solo se crean las que faltaban")
+    assert_eq(box._virtualRows[11]._set.text, "11", "y traen su dato")
+  end)
+
+  it("encoger NUNCA crea frames: oculta las sobrantes y conserva el pool", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    inst:Resize({ height = 200 })
+    local pooled = helper.frameCount()
+    inst:Resize({ height = 40 })
+    assert_eq(helper.frameCount(), pooled, "encoger no materializa nada")
+    assert_eq(#box._virtualRows, 3, "ceil(40/20)+1 = 3 filas a la vista")
+    inst:Resize({ height = 200 })
+    assert_eq(helper.frameCount(), pooled, "y volver a crecer reusa el pool que ya había")
+    assert_eq(#box._virtualRows, 11)
+  end)
+
+  it("Resize{ columns } re-planifica: nuevo ancho de celda y nueva rejilla", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    assert_eq(lastPoint(box._virtualRows[1])[4], 0)
+    inst:Resize({ columns = 2 })
+    local r = box._virtualRows
+    assert_eq(lastPoint(r[1])[4], 0)
+    assert_eq(lastPoint(r[2])[4], 40, "2 columnas sobre 80px → colWidth 40")
+    assert_eq(lastPoint(r[2])[5], 0, "y el segundo va en la MISMA fila")
+    assert_eq(lastPoint(r[3])[5], -20, "el tercero baja")
+  end)
+
+  it("Resize{ width } recalcula el ancho de columna", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W, { columns = 2 })
+    assert_eq(lastPoint(box._virtualRows[2])[4], 40)
+    inst:Resize({ width = 120 })
+    assert_eq(lastPoint(box._virtualRows[2])[4], 60, "120/2 = 60")
+  end)
+
+  it("contentHeight se re-anuncia (la barra de Craft lo sigue)", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    assert_eq(inst:contentHeight(), 2000, "100 filas de 20")
+    inst:Resize({ columns = 2 })
+    assert_eq(inst:contentHeight(), 1000, "50 filas de 20")
+  end)
+
+  it("es idempotente: los mismos valores no repintan nada", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    local row = box._virtualRows[1]
+    local painted = #row._points
+    inst:Resize({ height = 100 })
+    inst:Resize({ width = 80, height = 100, columns = 1 })
+    assert_eq(#row._points, painted, "sin cambio de geometría, ni un SetPoint")
+  end)
+
+  it("SetViewport y SetColumns son azúcar de Resize", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    inst:SetViewport(120, 200)
+    assert_eq(#box._virtualRows, 11)
+    inst:SetColumns(2)
+    assert_eq(lastPoint(box._virtualRows[2])[4], 60, "120/2 = 60")
+  end)
+
+  it("valida lo mismo que el constructor", function()
+    local W = helper.loadWeaveWow()
+    local _, inst = grid(W)
+    assert_error(function() inst:Resize(5) end, "Resize")
+    assert_error(function() inst:Resize({ height = 0 }) end, "height")
+    assert_error(function() inst:Resize({ width = -1 }) end, "width")
+    assert_error(function() inst:Resize({ columns = 0 }) end, "columns")
+  end)
+
+  it("el padding sigue sin poder dejar el viewport sin sitio", function()
+    local W = helper.loadWeaveWow()
+    local _, inst = grid(W, { padding = 10 })
+    assert_error(function() inst:Resize({ width = 20 }) end, "padding")
+  end)
+
+end)
+
+describe("Weave.virtual: Resize en combate (crecer se difiere, encoger no)", function()
+
+  it("agrandar en combate no crea frames: pinta lo que hay y avisa UNA vez", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    helper.setInCombat(true)
+    local lines = capturePrints(function()
+      inst:Resize({ height = 200 })
+      local before = helper.frameCount() -- el vigía de PLAYER_REGEN_ENABLED ya existe
+      inst:Resize({ height = 300 })      -- segundo desbordamiento: mismo silencio
+      assert_eq(helper.frameCount(), before, "jamás crear filas en combate")
+    end)
+    assert_eq(#box._virtualRows, 6, "se ve lo que el pool permite")
+    assert_eq(#lines, 1, "el aviso suena una sola vez por lista")
+  end)
+
+  it("encoger SÍ se aplica en el acto durante el combate", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    helper.setInCombat(true)
+    local lines = capturePrints(function() inst:Resize({ height = 40 }) end)
+    assert_eq(#box._virtualRows, 3, "encoger no necesita crear nada")
+    assert_eq(#lines, 0, "y por tanto no hay nada que avisar")
+  end)
+
+  it("al salir de combate (PLAYER_REGEN_ENABLED) salda el pool y repinta", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    helper.setInCombat(true)
+    helper.silently(function() inst:Resize({ height = 200 }) end)
+    assert_eq(#box._virtualRows, 6, "durante el combate se ven menos filas de las ideales")
+    helper.setInCombat(false)
+    helper.fireEvent("PLAYER_REGEN_ENABLED")
+    assert_eq(#box._virtualRows, 11, "la deuda de pool se salda al salir de combate")
+    assert_eq(box._virtualRows[11]._set.text, "11")
+  end)
+
+  it("re-planifica igual en combate: la geometría no espera", function()
+    local W = helper.loadWeaveWow()
+    local box, inst = grid(W)
+    helper.setInCombat(true)
+    helper.silently(function() inst:Resize({ columns = 2 }) end)
+    assert_eq(lastPoint(box._virtualRows[2])[4], 40, "colWidth nuevo YA, sin frames nuevos")
+    assert_eq(inst:contentHeight(), 1000)
+  end)
+
+end)
