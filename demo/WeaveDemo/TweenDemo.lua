@@ -5,8 +5,10 @@
 -- hiding. Inside, a bar whose value slides and whose color transitions channel-by-channel
 -- (array tween). The entire open/close dance is declarative: no timers, no OnUpdate,
 -- no callbacks. At rest the shared driver's frame is hidden → zero per-frame cost.
---   /weavetween        → toggle open/close (fade + expand, exit hides via :animating())
---   /weavetween <0-100> → set the bar target: value slides, color transitions
+--   /weavetween            → toggle open/close (fade + expand, exit hides via :animating())
+--   /weavetween <0-100>    → set the bar target: value slides, color transitions, and the
+--                            bar FADES IN via tw:snap() — the fade-in idiom
+--   /weavetween now <0-100> → snap the bar straight to the target: no slide at all
 -- Combat-safe: toggling only mutates existing frames (tween never creates one).
 --
 -- WoW RENDER CAVEAT (not a Weave issue — verified in-game via GetAlpha/GetHeight: the
@@ -30,6 +32,12 @@ local alpha  = W.tween(W.computed(function() return open() and 1 or 0 end),
   { duration = 0.5 })
 local height = W.tween(W.computed(function() return open() and PANEL_H or COLLAPSED_H end),
   { duration = 0.5, easing = W.easing.outQuad })
+
+-- FADE-IN (FR Coffer 2026-08-23). This tween's target is the LITERAL 1: it never moves.
+-- All the motion comes from snap() — each new bar target drops the bar to half light and
+-- it climbs back to 1 on its own. Without snap this needed a ping-pong through a signal
+-- (down, then up), which takes twice as long and shows a full-brightness frame first.
+local barFade = W.tween(1, { duration = 0.35 })
 
 -- The bar value slides; the color transitions as an array {r,g,b}, lerped per channel.
 local barValue = W.tween(pct, { duration = 0.4 })
@@ -68,6 +76,7 @@ W.new("Frame", {
       name             = "WeaveTweenBar",
       point            = { "TOP", 0, -38 },
       size             = { 220, 20 },
+      alpha            = barFade,
       minMax           = { 0, 1 },
       value            = barValue,
       statusBarColor   = barColor,
@@ -86,15 +95,25 @@ W.new("Frame", {
 -- /weavetween: toggle, or a 0-100 number to move the bar target.
 SLASH_WEAVETWEEN1 = "/weavetween"
 SlashCmdList.WEAVETWEEN = function(msg)
-  local n = tonumber(msg)
-  if n and n >= 0 and n <= 100 then
+  local now = msg:match("^now%s+(%d+)$")
+  local n = tonumber(now or msg)
+  if now and n and n >= 0 and n <= 100 then
+    -- The OTHER half of snap: land ON the current target, so there is no road left and
+    -- the tween simply disarms. That is "jump to the end, skip the animation".
     pct:set(n / 100)
-    print(("|cff44ff44WeaveTween:|r bar target = %d%% (value slides, color transitions)"):format(n))
+    barValue:snap(n / 100)
+    print(("|cff44ff44WeaveTween:|r bar = %d%% AT ONCE (snap to the target: no slide)"):format(n))
+  elseif n and n >= 0 and n <= 100 then
+    pct:set(n / 100)
+    barFade:snap(0.35) -- drop to half light; it rises back to 1 by itself
+    print(("|cff44ff44WeaveTween:|r bar target = %d%% (value slides, color transitions,"
+      .. " bar fades in from half light)"):format(n))
   elseif msg == "" or msg == "toggle" then
     open:set(not open:peek())
     print("|cff44ff44WeaveTween:|r " .. (open:peek() and "opening (fade + expand)"
       or "closing (fade out, then hides when the animation ends)"))
   else
-    print("|cffffd100WeaveTween:|r /weavetween (toggle) · /weavetween <0-100> (bar target)")
+    print("|cffffd100WeaveTween:|r /weavetween (toggle) · /weavetween <0-100> (bar target,"
+      .. " fades in) · /weavetween now <0-100> (snap straight to it, no slide)")
   end
 end
