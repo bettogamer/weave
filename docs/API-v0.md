@@ -209,6 +209,21 @@ Weave.new("StatusBar", { statusBarColor = Weave.tween(color, { duration = 0.5 })
   al llegar a la meta (o al sembrarse). Es una señal más (trackea): sirve para coordinar
   entrada/salida sin callbacks — un frame que se oculta al terminar su fundido de salida
   hace `shown = W.computed(function() return abierto() or t:animating() end)`.
+- **`t:snap(value)` — teletransporte sin interpolar** (FR Coffer 2026-08-23, v0.9): fija el
+  valor a `value` **en el acto** y **sigue apuntando al destino**. Si queda camino, la
+  animación re-arranca desde ahí (`animating()` → true); si `value` YA es el destino, no hay
+  nada que recorrer y el tween simplemente se desarma (`animating()` → false). Una sola
+  operación cubre así los dos usos:
+  ```lua
+  local alpha = Weave.tween(visible, { duration = 0.25 })
+  alpha:snap(0.45)          -- FADE-IN: entra a media luz y sube solo hasta visible()
+  alpha:snap(visible())     -- SALTAR AL FINAL: sin animación (nada que recorrer)
+  ```
+  Antes de `snap`, el fade-in obligaba a un **ping-pong** por la señal fuente (bajar y volver):
+  el doble de duración y un frame a brillo pleno antes de bajar. Invariante que preserva: un
+  tween nunca reposa en un valor distinto de su destino. `value` es número o array (mismo
+  contrato que `target`). Un `value` o un destino **secretos** saltan pero no animan; tras
+  `dispose()` es no-op.
 - Read-only: `t()`, `t:peek()`, `t:isSecret()`; `Weave.isReactive(t)` → true,
   `Weave.isWritable(t)` → false. El motor de interpolación es Lua puro (`core/Tween.lua`,
   testeable headless); el reloj/driver es wow (`wow/Anim.lua`).
@@ -394,6 +409,26 @@ W.new("Frame", {
   dimensiona su thumb y su `max`. Si `opts.scroll` se omite, `virtual` crea su propia señal y
   engancha la rueda del ratón (funciona solo, sin Craft). Weave nunca menciona a Craft:
   comparten una señal (posición hacia dentro, `contentHeight` hacia fuera).
+- **Viewport vivo — `inst:Resize{ width?, height?, columns? }`** (FR Coffer 2026-08-27, v0.9):
+  el viewport y el número de columnas dejan de ser constantes de construcción. Azúcar:
+  `inst:SetViewport(w, h)`, `inst:SetViewportHeight(h)`, `inst:SetColumns(n)`. Requiere el
+  **instance** (se obtiene pasando `opts.parent`, igual que `:contentHeight()`). Desbloquea la
+  ventana redimensionable con grip: antes, cada cambio de geometría obligaba a reconstruir el
+  grid entero (o a pedir `/reload`).
+  ```lua
+  local v = W.virtual(stream, { parent = viewport, viewport = { 240, 400 }, columns = 6, ... })
+  v:Resize({ width = w, height = h, columns = math.floor(w / 40) }) -- en cada frame del arrastre
+  ```
+  - **Idempotente**: misma geometría → ni un `SetPoint`. Valida lo mismo que el constructor
+    (medidas > 0, `columns >= 1`, el padding horizontal tiene que caber).
+  - **Encoger es gratis**: los frames que sobran quedan ocultos en el pool y se **reusan** si
+    vuelve a crecer — no se destruye nada, así que un arrastre no genera churn de frames.
+  - **Combate:** la geometría se aplica **siempre y en el acto** (`colWidth`, `contentHeight`,
+    re-empaquetado del flujo). Lo único que se difiere es **crear** las filas extra que pide un
+    viewport más alto: en combate se ve lo que el pool permite, avisa una vez y salda la deuda
+    en `PLAYER_REGEN_ENABLED` (mismo idioma que `each`). Encoger en combate no avisa nada.
+  - La señal de `scroll` sigue siendo del consumidor (ADR-0006): al encoger, re-clámpala tú
+    (`virtual` solo clampa lo que PINTA) — mismo patrón que al colapsar un grupo.
 - **Identidad (keying):** **por posición** (slot i ↔ entrada visible i — el caso ventana de
   scroll: el dato fluye por el slot al scrollear). Es el modo de Fase 1 y el correcto para una
   ventana virtual. Identidad estable con `opts.key` (conservar el frame de un dato al
@@ -426,6 +461,22 @@ W.new("Frame", {
     al peor caso de visibilidad de ese tipo (acotado por el viewport). Layout por el planificador
     puro `core/Flow.lua` (`_flowLayout` por cambio de datos + `_flowVisible` por scroll, búsqueda
     binaria). Keying posicional, igual que Fase 1.
+  - **Sangría por fila — `opts.indentOf(entry) → px`** (FR Coffer 2026-08-26, v0.9): una tanda
+    de celdas **cuelga** de la cabecera de arriba, para que una sub-sección no se lea como
+    hermana de su madre. Es **por fila** (simétrico con `typeOf`), no por tipo: un mismo
+    `render` sirve para todos los niveles — no hace falta declarar `item` e `itemSangrado`.
+    ```lua
+    indentOf = function(e) return (e.depth or 0) * 16 end,
+    ```
+    - Las **celdas conservan su tamaño** y la tanda pasa a caber en **menos columnas**
+      (`floor((ancho_útil − indent) / colWidth)`, mínimo 1). Es la semántica correcta para un
+      grid de ítems: si encogieran las celdas, la sangría se leería como "estos ítems son más
+      pequeños". El nº de columnas deja por tanto de ser global.
+    - Un **cambio de sangría rompe la fila abierta**, igual que una cabecera: una sub-sección
+      empieza en su propia línea.
+    - Las filas de **ancho completo también se insetan** (x + `indent`, ancho − `indent`), así
+      que una sub-cabecera cuelga alineada con sus propios ítems.
+    - Requiere modo heterogéneo (`opts.types`). Default 0 → sin cambio de comportamiento.
   - **El colapso lo posee el consumidor** (ADR-0010): `virtual` es un motor de ventana sobre un
     stream plano — no sabe qué es un "grupo". Colapsar = poner un stream nuevo sin los ítems de ese
     grupo (el `render` de la cabecera trae la flecha + un click que re-setea la señal del stream).

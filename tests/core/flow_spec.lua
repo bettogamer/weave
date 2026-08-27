@@ -164,3 +164,68 @@ describe("Weave._flowVisible: rango de filas visuales visibles (por scroll)", fu
   end)
 
 end)
+
+describe("Weave._flowLayout: sangría por fila (FR Coffer 2026-08-26)", function()
+
+  -- Un ítem sangrado: mismo alto, pero cuelga `indent` px a la derecha y su tanda
+  -- cabe en menos columnas (el ancho de celda NO cambia: eso lo garantiza el ui).
+  local function sub(h, indent, cols)
+    return { grid = true, height = h or 40, indent = indent, columns = cols }
+  end
+
+  it("un cambio de sangría CIERRA la fila abierta (aunque quedaran columnas libres)", function()
+    local W = helper.loadWeave()
+    -- 2 ítems a ras + 2 sangrados, con columns = 3: sin sangría irían todos en 1 fila
+    local L = W._flowLayout({ item(40), item(40), sub(40, 20, 2), sub(40, 20, 2) },
+      { columns = 3 })
+    assert_eq(#L.rows, 2, "la sangría rompe el flujo igual que una cabecera")
+    assert_eq(L.rows[1].first, 1); assert_eq(L.rows[1].count, 2)
+    assert_eq(L.rows[2].first, 3); assert_eq(L.rows[2].count, 2)
+  end)
+
+  it("cada fila recuerda su sangría, para que el ui la aplique", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ item(40), sub(40, 20, 2), header(24) }, { columns = 3 })
+    assert_eq(L.rows[1].indent, 0, "sin sangría declarada = 0")
+    assert_eq(L.rows[2].indent, 20)
+    assert_eq(L.rows[3].indent, 0)
+  end)
+
+  it("la tanda sangrada empaqueta con SUS columnas, no con las globales", function()
+    local W = helper.loadWeave()
+    -- columns global 3; la tanda sangrada solo tiene sitio para 2
+    local items = { sub(40, 20, 2), sub(40, 20, 2), sub(40, 20, 2), sub(40, 20, 2) }
+    local L = W._flowLayout(items, { columns = 3 })
+    assert_eq(#L.rows, 2, "4 ítems a 2 por fila")
+    assert_eq(L.rows[1].count, 2); assert_eq(L.rows[1].y, 0)
+    assert_eq(L.rows[2].count, 2); assert_eq(L.rows[2].y, 40)
+    assert_eq(L.contentHeight, 80, "menos columnas = más alto de contenido")
+  end)
+
+  it("dos niveles de sangría seguidos: una fila por nivel", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ sub(40, 20, 2), sub(40, 40, 1) }, { columns = 3 })
+    assert_eq(#L.rows, 2)
+    assert_eq(L.rows[1].indent, 20)
+    assert_eq(L.rows[2].indent, 40)
+  end)
+
+  it("una fila de ancho completo también lleva su sangría", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ { grid = false, height = 24, indent = 20 } }, { columns = 3 })
+    assert_eq(L.rows[1].indent, 20, "la sub-cabecera cuelga como sus ítems")
+    assert_eq(L.rows[1].height, 24)
+  end)
+
+  it("sin sangría, el plan es EXACTAMENTE el de antes (default 0)", function()
+    local W = helper.loadWeave()
+    local items = { header(24), item(40), item(40), item(40), item(40) }
+    local L = W._flowLayout(items, { columns = 3, spacing = 4 })
+    assert_eq(#L.rows, 3)
+    assert_eq(L.rows[1].count, 1); assert_eq(L.rows[1].y, 0)
+    assert_eq(L.rows[2].count, 3); assert_eq(L.rows[2].y, 28)
+    assert_eq(L.rows[3].count, 1); assert_eq(L.rows[3].y, 72)
+    assert_eq(L.contentHeight, 112)
+  end)
+
+end)

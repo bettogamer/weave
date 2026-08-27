@@ -14,17 +14,57 @@
 local Weave = LibStub("Weave-1.0", true)
 if not Weave or Weave.virtual then return end -- lib missing or duplicate copy
 
-local InCombatLockdown = InCombatLockdown
+local CreateFrame, InCombatLockdown = CreateFrame, InCombatLockdown
 local floor, ceil, max = math.floor, math.ceil, math.max
 
 local COMBAT_MSG = "Weave.virtual: creating a virtualized list is forbidden in combat — "
   .. "build the UI out of combat; in combat the fixed pool only re-glazes and scrolls"
 
 ------------------------------------------------------------------------------
+-- Shared out-of-combat watcher: instances whose viewport GREW in combat (Resize,
+-- FR Coffer 2026-08-27) can't materialize the extra pooled rows right then, so
+-- they register here and settle the debt on PLAYER_REGEN_ENABLED — the same
+-- degrade-don't-crash spirit as Weave.each. Created lazily: an instance that
+-- never resizes in combat never pays for the frame.
+------------------------------------------------------------------------------
+local regenFrame = nil
+local pending = {} -- instance -> true
+
+local function ensureRegenWatcher()
+  if regenFrame then return end
+  regenFrame = CreateFrame("Frame")
+  regenFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+  regenFrame:SetScript("OnEvent", function()
+    for inst in pairs(pending) do
+      pending[inst] = nil
+      if not inst._disposed then
+        inst._geom:set(inst._geom:peek() + 1) -- re-drive: now the pool may grow
+      end
+    end
+  end)
+end
+
+------------------------------------------------------------------------------
 -- Virtual instances
 ------------------------------------------------------------------------------
 local VirtualMethods = {}
 local VirtualMT = { __index = VirtualMethods }
+
+function VirtualMethods:_warnOnce(what, msg)
+  if self._warned[what] then return end
+  self._warned[what] = true
+  print("|cffffcc00Weave.virtual|r: " .. msg)
+end
+
+local POOL_MSG = "the viewport grew in combat — showing fewer rows than it now fits; "
+  .. "the pool will catch up out of combat (no frame is ever created in combat)"
+
+-- Registers the pool debt left by a growth attempted in combat.
+function VirtualMethods:_deferGrowth()
+  ensureRegenWatcher()
+  pending[self] = true
+  self:_warnOnce("pool", POOL_MSG)
+end
 
 -- Bakes one pooled row with `render`: fresh item/index signals + one render run,
 -- inside the instance's scope so the row's binds (and hide-on-dispose) die with it.
@@ -59,14 +99,27 @@ function VirtualMethods:_initHomogeneous(opts)
   self._rowHeight = opts.rowHeight
   self._stride    = opts.rowHeight + self._spacing
   self._pool      = {}
-  -- Pool is FIXED, sized to the viewport (core formula), never to the list.
-  self._capacity = Weave._windowPlan(0, {
-    rowHeight = opts.rowHeight, viewportHeight = self._viewportH,
+  self:_ensureCapacity()
+end
+
+-- Pool is FIXED to the VIEWPORT (core formula), never to the list — but the viewport
+-- can now change (Resize), so this runs on every drive, not just at build time. It only
+-- ever GROWS: shrinking keeps the frames (hidden by _window, reused if it grows back),
+-- which is why shrinking is always combat-safe and growing is the only deferred half.
+function VirtualMethods:_ensureCapacity()
+  local want = Weave._windowPlan(0, {
+    rowHeight = self._rowHeight, viewportHeight = self._viewportH,
     columns = self._columns, spacing = self._spacing,
   }).capacity
-  for p = 1, self._capacity do
-    self._pool[p] = self:_materializeRow(self._render)
+  local pool = self._pool
+  if #pool < want then
+    if InCombatLockdown() then
+      self:_deferGrowth()
+    else
+      for p = #pool + 1, want do pool[p] = self:_materializeRow(self._render) end
+    end
   end
+  self._capacity = #pool
 end
 
 function VirtualMethods:_window()
@@ -114,16 +167,32 @@ function VirtualMethods:_initHetero(opts)
   self._pools  = {}
   self._cursor = {}
   self._lastList = nil
-  -- One pool per type, each sized to the WORST-CASE visible count of that type (bounded
-  -- by the viewport). A cell baked as a header can never become an item, hence per type.
-  for name, spec in pairs(opts.types) do
-    local n = spec.grid and (ceil(self._viewportH / spec.height) + 1) * self._columns
-                        or  (ceil(self._viewportH / spec.height) + 1)
-    local pool = {}
-    for p = 1, n do pool[p] = self:_materializeRow(spec.render) end
-    self._pools[name]  = pool
+  for name in pairs(opts.types) do
+    self._pools[name]  = {}
     self._cursor[name] = 0
   end
+  self:_ensurePools()
+end
+
+-- One pool per type, each sized to the WORST-CASE visible count of that type (bounded
+-- by the viewport). A cell baked as a header can never become an item, hence per type.
+-- Grid types are bounded by the GLOBAL `columns`, which stays the ceiling even when an
+-- indented band packs fewer per row. Grows only — see _ensureCapacity.
+function VirtualMethods:_ensurePools()
+  local inCombat, short = InCombatLockdown(), false
+  for name, spec in pairs(self._types) do
+    local rows = ceil(self._viewportH / spec.height) + 1
+    local want = spec.grid and rows * self._columns or rows
+    local pool = self._pools[name]
+    if #pool < want then
+      if inCombat then
+        short = true
+      else
+        for p = #pool + 1, want do pool[p] = self:_materializeRow(spec.render) end
+      end
+    end
+  end
+  if short then self:_deferGrowth() end
 end
 
 -- O(total): walk the stream into the pure per-entry descriptor + the flow layout. Only
@@ -133,6 +202,7 @@ function VirtualMethods:_rebuildLayout(list)
     error("Weave.virtual: source must provide an array, got " .. type(list), 0)
   end
   local desc, entryType = {}, {}
+  local usableW = self._viewportW - 2 * self._padH
   for i = 1, #list do
     local t = self._typeOf(list[i])
     local spec = self._types[t]
@@ -140,6 +210,23 @@ function VirtualMethods:_rebuildLayout(list)
       error("Weave.virtual: typeOf returned unknown type '" .. tostring(t) .. "'", 0)
     end
     desc[i] = { grid = spec.grid or false, height = spec.height }
+    -- Indent (FR Coffer 2026-08-26): the cell KEEPS its width and the band loses
+    -- columns — indented cells must measure the same as their siblings above, or the
+    -- indent reads as "these items are smaller". Core gets both numbers ready-made.
+    if self._indentOf then
+      local indent = self._indentOf(list[i])
+      if type(indent) ~= "number" or indent < 0 then
+        error("Weave.virtual: opts.indentOf must return a number >= 0, got "
+          .. tostring(indent), 0)
+      end
+      if indent > 0 then
+        desc[i].indent = indent
+        if desc[i].grid then
+          local cols = floor((usableW - indent) / self._colWidth)
+          desc[i].columns = cols >= 1 and cols or 1 -- always room for at least one
+        end
+      end
+    end
     entryType[i] = t
   end
   self._layout = Weave._flowLayout(desc, {
@@ -175,10 +262,10 @@ function VirtualMethods:_paintHetero()
         frame._weaveItem:set(list[j])
         frame._weaveIndex:set(j)
         frame:ClearAllPoints()
-        local x = self._padH + (grid and (j - row.first) * self._colWidth or 0)
+        local x = self._padH + row.indent + (grid and (j - row.first) * self._colWidth or 0)
         frame:SetPoint("TOPLEFT", self._container, "TOPLEFT", x, scroll - row.y)
         if not grid then -- full-width row: virtual owns its size (the layout's authority)
-          frame:SetWidth(self._viewportW - 2 * self._padH)
+          frame:SetWidth(self._viewportW - 2 * self._padH - row.indent)
           frame:SetHeight(self._types[t].height)
         end
         frame:Show()
@@ -200,17 +287,67 @@ end
 -- enclosing effect re-runs on any change; the O(total) layout rebuild is cached by array
 -- identity, so scrolling only repaints.
 function VirtualMethods:_drive()
+  self._geom() -- track the viewport/columns signal: Resize re-runs this effect
   if self._hetero then
     local list = self._listGet()
-    if list ~= self._lastList then
-      self._lastList = list
+    if list ~= self._lastList or self._layoutDirty then
+      self._lastList    = list
+      self._layoutDirty = false
       self:_rebuildLayout(list)
     end
+    self:_ensurePools()
     self:_paintHetero()
   else
+    self:_ensureCapacity()
     self:_window()
   end
 end
+
+------------------------------------------------------------------------------
+-- Resize: a LIVE viewport (FR Coffer 2026-08-27)
+------------------------------------------------------------------------------
+-- Geometry is applied ALWAYS and at once — colWidth, contentHeight and the re-packed
+-- flow never wait for combat to end. The only half that cannot happen in combat is
+-- CREATING the extra pooled rows a taller viewport wants, and that is deferred to
+-- PLAYER_REGEN_ENABLED (showing fewer rows than ideal mid-fight is survivable).
+-- Not a setter storm: it bumps one internal signal and the windowing effect re-plans
+-- and repaints down the path it already uses.
+function VirtualMethods:Resize(opts)
+  if type(opts) ~= "table" then
+    error("Weave.virtual: Resize expects a table { width?, height?, columns? }, got "
+      .. type(opts), 2)
+  end
+  if self._disposed then return end
+
+  local w = opts.width   or self._viewportW
+  local h = opts.height  or self._viewportH
+  local n = opts.columns or self._columns
+  if type(w) ~= "number" or w <= 0 then
+    error("Weave.virtual: Resize width must be a positive number", 2)
+  end
+  if type(h) ~= "number" or h <= 0 then
+    error("Weave.virtual: Resize height must be a positive number", 2)
+  end
+  if type(n) ~= "number" or n < 1 then
+    error("Weave.virtual: Resize columns must be a number >= 1", 2)
+  end
+  if 2 * self._padH >= w then
+    error("Weave.virtual: horizontal padding (" .. self._padH .. ") leaves no room in "
+      .. "viewport width " .. w, 2)
+  end
+  if w == self._viewportW and h == self._viewportH and n == self._columns then
+    return -- idempotent: same geometry, not a single SetPoint
+  end
+
+  self._viewportW, self._viewportH, self._columns = w, h, n
+  self._colWidth    = (w - 2 * self._padH) / n
+  self._layoutDirty = true -- the flow plan depends on columns/width, never on the height
+  self._geom:set(self._geom:peek() + 1)
+end
+
+function VirtualMethods:SetViewport(w, h)    self:Resize({ width = w, height = h }) end
+function VirtualMethods:SetViewportHeight(h) self:Resize({ height = h }) end
+function VirtualMethods:SetColumns(n)        self:Resize({ columns = n }) end
 
 ------------------------------------------------------------------------------
 -- Public API
@@ -249,6 +386,10 @@ function Weave._materializeVirtual(container, d)
     _maxScroll     = 0,
     _scope         = Weave.scope(),
     _warned        = {},
+    _indentOf      = opts.indentOf,
+    _geom          = Weave.signal(0), -- bumped by Resize; the drive effect tracks it
+    _layoutDirty   = false,
+    _disposed      = false,
   }, VirtualMT)
 
   inst._listGet = Weave.isReactive(source) and source or function() return source end
@@ -271,7 +412,11 @@ function Weave._materializeVirtual(container, d)
 
   -- One handle owns the whole grid: dying with the enclosing scope kills the source
   -- effect and every pooled row's binds, and hides the rows (their own handles).
-  Weave._attachToScope({ dispose = function() inst._scope:dispose() end })
+  Weave._attachToScope({ dispose = function()
+    inst._disposed = true
+    pending[inst] = nil
+    inst._scope:dispose()
+  end })
 
   -- Windowing effect: tracks the reactive source and scroll; re-glazes on change.
   inst._scope:run(function()
@@ -328,6 +473,16 @@ function Weave.virtual(source, opts)
     end
     if type(opts.rowHeight) ~= "number" or opts.rowHeight <= 0 then
       error("Weave.virtual: opts.rowHeight must be a positive number", 2)
+    end
+  end
+
+  if opts.indentOf ~= nil then
+    if opts.types == nil then
+      error("Weave.virtual: opts.indentOf requires opts.types (indent is a heterogeneous-"
+        .. "flow feature: it re-packs bands of grid cells)", 2)
+    end
+    if type(opts.indentOf) ~= "function" then
+      error("Weave.virtual: opts.indentOf must be a function, got " .. type(opts.indentOf), 2)
     end
   end
 
