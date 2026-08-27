@@ -206,6 +206,19 @@ W.bind(self.bar, "statusBarColor", barColor)
   redraw). So a collapse should animate height to a **non-zero header height**, never 0;
   full invisibility is the **alpha fade** (children inherit the parent's alpha). `Hide`/
   `Show` (via the `shown` bind above) is fine. Verified in-game 12.0.7; not a Weave bug.
+- **`t:snap(value)` (v0.9+) — teleport, then keep going.** It sets the value at once and
+  re-aims at the current target: if there is road left it restarts from there; if `value`
+  already IS the target there is nothing to travel, so it just disarms. That single call
+  covers both idioms:
+  ```lua
+  local alpha = W.tween(visible, { duration = 0.25 })
+  alpha:snap(0.45)        -- FADE-IN: content enters at half light and rises on its own
+  alpha:snap(visible())   -- JUMP TO THE END: no animation at all
+  ```
+  Use the first form whenever content is *replaced* under a filter/tab change — before
+  `snap` this needed a ping-pong through the source signal (down, then back up), which
+  takes twice as long and shows one full-brightness frame first. A tween never rests at a
+  value that is not its target, so `animating()` turns on only if road actually remains.
 - Create the tweens inside the component's scope (§4.2) so they dispose with the instance.
 
 ### 4.7 Virtualized grids: `Weave.virtual` (v0.6+)
@@ -255,8 +268,39 @@ craftScrollbar.onChange = function(px) scroll:set(px) end                      -
     if scroll:peek() > maxS then scroll:set(maxS) end               -- peek: no loop
   end)
   ```
-- Keying is positional (the window case); `render` is one homogeneous cell type in
-  Fase 1. Interleaved group headers (heterogeneous rows) land in a later release.
+- Keying is positional (the window case). `render` + `rowHeight` is the homogeneous mode;
+  for **interleaved group headers** (v0.7+) swap them for `opts.typeOf(entry)` +
+  `opts.types = { [name] = { render, height, grid? } }`. Types with `grid = true` flow in
+  the N columns; types without it are **full-width** and break the flow. There is a pool
+  **per type** (a cell baked as a header can never recycle as an item). **Collapse is
+  yours**: the stream is a computed over your own `collapsed` signal — `virtual` is a
+  window over whatever flat stream it gets and does not know what a group is.
+- **Resizable windows — `grid:Resize{ width?, height?, columns? }` (v0.9+).** The viewport
+  stopped being a construction constant, so a window with a resize grip no longer has to
+  tear the grid down (or ask for a `/reload`). Sugar: `SetViewport(w, h)`,
+  `SetViewportHeight(h)`, `SetColumns(n)`. Call it on every frame of the drag:
+  ```lua
+  window.onResize = function(w, h)
+    grid:Resize({ width = w, height = h, columns = math.floor(w / CELL) })
+  end
+  ```
+  Idempotent when nothing changed. **Shrinking is free** — the spare cells stay hidden in
+  the pool and are reused when it grows back, so dragging does not churn frames. **In
+  combat** the geometry still applies at once; only *creating* the extra cells a taller
+  viewport wants is deferred to `PLAYER_REGEN_ENABLED` (it warns once and shows fewer rows
+  meanwhile), exactly like `Weave.each`. Remember to re-clamp your scroll signal, same as
+  when a group collapses.
+- **Indented sub-sections — `opts.indentOf(entry) → px` (v0.9+).** For a band of cells that
+  hangs off the header above it (a category split by slot). It is **per row**, not per
+  type, so ONE `render` serves every level — no `item` / `itemIndented` twins:
+  ```lua
+  indentOf = function(e) return (e.depth or 0) * 16 end,
+  ```
+  Cells **keep their size** and the band simply fits fewer columns
+  (`floor((usableW - indent) / colWidth)`, min 1) — if the cells shrank instead, the indent
+  would read as "these items are smaller". A change of indent breaks the open row, and
+  full-width rows are inset and narrowed too, so a sub-header hangs aligned with its own
+  items. Heterogeneous mode only; default 0.
 - Create it inside the component's scope (§4.2) so it disposes with the instance.
 
 ## 5. Taint rules (WoW 12.0+ secret values)

@@ -16,7 +16,59 @@
 
 _(vacío — ver Cerrados)_
 
+
 ## Cerrados
+
+- **`Weave.tween`: saltar a un valor sin interpolar (`:snap`)** — ✅ **CERRADO 2026-08-27**
+  (pedido por **Coffer 2026-08-23**, fundido del grid al cambiar de filtro; ADR-0011). El tween
+  solo sabía interpolar *desde donde está*, así que el *fade-in* —el patrón de aparición más
+  común— obligaba a un **ping-pong** por la señal fuente: el doble de duración y un frame a
+  brillo pleno antes de bajar. **Resuelto** con `tw:snap(value)`, que **teletransporta y SIGUE**
+  (decisión del owner frente a la letra del FR, que pedía teletransportar y desarmar): fija el
+  valor en el acto y re-apunta al destino actual; si `value` ya ES el destino, se desarma. Con
+  eso una sola operación cubre el fade-in (`snap(0.45)` con destino 1) y el "saltar al final"
+  (`snap(destino)`), y se preserva la invariante de que **un tween nunca reposa en un valor
+  distinto de su destino**. `animating()` se enciende solo si queda camino. Arrays, secrets y
+  `dispose()` cubiertos. Tests: +10 (`tests/wow/anim_spec.lua`). Docs: API-v0 §2,
+  CRAFT-INTEGRATION §4.6. Demo `/weavetween <0-100>` (fade-in) y `/weavetween now <0-100>`
+  (salto seco). **Verificado in-game** por el owner (2026-08-27).
+
+- **`Weave.virtual`: viewport y columnas MUTABLES (`Resize`)** — ✅ **CERRADO 2026-08-27**
+  (pedido por **Coffer 2026-08-26**, reiterado el **2026-08-27** pidiendo solo el alto;
+  ADR-0011). `opts.viewport`/`opts.columns` eran números de constructor, así que la ventana de
+  ítems de Coffer estaba `resizable = false` y **cada cambio de geometría pedía `/reload`**.
+  **Resuelto con el FR completo, no con el subset** (decisión del owner):
+  `inst:Resize{ width?, height?, columns? }` + azúcar `SetViewport` / `SetViewportHeight` /
+  `SetColumns`. Por dentro **no es imperativo**: el viewport pasa a ser una señal interna que
+  lee el effect de ventaneo, así que fijarla re-planifica y repinta por el camino que ya
+  existía. **Combate = salida (a)** (la preferida por el consumidor): la geometría se aplica
+  siempre y en el acto; solo se difiere **crear** las filas extra, con aviso único y catch-up en
+  `PLAYER_REGEN_ENABLED` (idioma de `each`). Encoger nunca crea nada → gratis y silencioso
+  incluso en combate, y el pool **solo crece** (las filas sobrantes se ocultan y se reusan: sin
+  churn durante el arrastre). Idempotente; valida lo mismo que el constructor. Tests: +17
+  (virtual_spec 13 + virtual_hetero_spec 4). Docs: API-v0 §4, CRAFT-INTEGRATION §4.7. Demo
+  `/weavegroups` con **grip de redimensionado real** en la esquina inferior derecha.
+  **Verificado in-game** por el owner (2026-08-27): el grid reflowea de forma continua durante el
+  arrastre, sin parpadeos ni `/reload`. **Pendiente del owner**: declarar `resizable = true` en la ventana de bolsas de Coffer y
+  borrar el aviso de `/reload` de los deslizadores de Ajustes.
+
+- **`Flow.lua`: sangría por fila — jerarquía visual dentro de un grid** — ✅ **CERRADO
+  2026-08-27** (pedido por **Coffer 2026-08-26**, sub-secciones dentro de una categoría;
+  ADR-0011). El planner repartía las filas `grid` con un `columns` **global**, así que una
+  sub-sección no podía colgar de su cabecera: se leía como hermana de su madre. Ni la tipografía
+  ni la banda de color lo suplían — **sangrar el CONTENIDO es lo que crea jerarquía en una
+  lista**. **Resuelto** con `opts.indentOf(entry) → px`, **por fila** (variante 2, decisión del
+  owner: simétrica con `typeOf` y un solo `render` por nivel, sin `item`/`itemSangrado`
+  gemelos). Semántica elegida: **bajan las COLUMNAS, no el tamaño de celda**
+  (`floor((ancho_útil − indent) / colWidth)`, mínimo 1) — si encogieran las celdas, la sangría
+  se leería como "estos ítems son más pequeños". Un cambio de sangría **rompe la fila abierta**,
+  igual que una cabecera; las filas de ancho completo **también se insetan y encogen** (decisión
+  del owner), así que una sub-cabecera cuelga alineada con sus propios ítems. El core sigue puro:
+  `_flowLayout` recibe `indent`/`columns` ya masticados por el ui. **Consecuencia asumida: el nº
+  de columnas deja de ser global en el planificador.** Tests: +12 (flow_spec 6 +
+  virtual_hetero_spec 6). Docs: API-v0 §4, CRAFT-INTEGRATION §4.7. Demo `/weavegroups`: "Armor"
+  con dos sub-secciones sangradas. **Verificado in-game** por el owner (2026-08-27): las celdas
+  sangradas miden lo mismo que las de la sección madre y caben 3 por fila en vez de 4.
 
 - **`Weave.virtual`: padding — no afeitar la primera fila/columna con el clip** — ✅ **CERRADO
   2026-07-23** (pedido por **Coffer 2026-07-23**, grid de bolsas/banco). Síntoma: la celda de la
