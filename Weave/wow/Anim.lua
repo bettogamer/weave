@@ -63,6 +63,17 @@ local function snapshot(v)
   return copy
 end
 
+-- Equality that also covers array values (identity would call every re-set a change).
+-- Callers must rule out secrets FIRST: comparing one raises.
+local function sameValue(a, b)
+  if type(a) == "table" and type(b) == "table" then
+    if #a ~= #b then return false end
+    for i = 1, #a do if a[i] ~= b[i] then return false end end
+    return true
+  end
+  return a == b
+end
+
 local function arm(tw, goal)
   tw._engine = Weave._tweenEngine(snapshot(tw._current:peek()), goal, tw._duration, tw._easing)
   tw._start = GetTime()
@@ -85,6 +96,33 @@ local TweenMethods = {}
 function TweenMethods:peek()      return self._current:peek() end
 function TweenMethods:isSecret()  return self._current:isSecret() end
 function TweenMethods:animating() return self._animating() end -- tracks like any signal
+
+--- snap(value): teleport to `value` NOW (no interpolation) and keep heading for the
+--- target. This is the fade-in idiom (FR Coffer 2026-08-23) — drop the panel to half
+--- light and let it rise on its own, with no need to wiggle the source signal into a
+--- ping-pong. Snapping TO the current target leaves no road ahead, so the tween simply
+--- disarms: that case IS "jump to the end, no animation". The tween never rests at a
+--- value that is not its target.
+function TweenMethods:snap(value)
+  if type(value) ~= "number" and type(value) ~= "table" then
+    error("Weave.tween: snap(value) expects a number or an array, got " .. type(value), 2)
+  end
+  if self._disposed then return end
+
+  -- A snap always cancels the run in flight; unregister BEFORE notifying (same
+  -- re-entrancy rule as onTick: the sets below run user effects synchronously).
+  if active[self] then removeActive(self) end
+  self._current:set(value)
+
+  local goal = self._goal
+  if goal ~= nil and not Weave._isSecret(goal) and not Weave._isSecret(value)
+    and not sameValue(value, goal) then
+    arm(self, goal) -- road left: re-aim from where we just landed
+  else
+    self._animating:set(false)
+    if #activeList == 0 and driverFrame then driverFrame:Hide() end
+  end
+end
 
 function TweenMethods:dispose()
   if self._disposed then return end
@@ -121,6 +159,7 @@ function Weave.tween(target, opts)
   local seeded = false
   tw._effect = Weave.effect(function()
     local goal = read() -- tracks target; holding/returning a secret is fine (no op)
+    tw._goal = goal     -- snap() re-aims at this WITHOUT re-reading (and re-tracking) target
     if not seeded then
       seeded = true
       tw._current:set(goal) -- seed at the target's current value (secret-safe via set)
