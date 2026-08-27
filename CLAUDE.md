@@ -168,11 +168,55 @@
   `dev` mergeado a `main`, tag `v0.8.0` sobre main. **`git push` lo hace el owner.** **VERIFICADO
   IN-GAME** por el owner (2026-07-23): `/weavevirtual` OK — el grid se ve insetado, sin afeitado en
   columna 0 / fila 0. Pendiente del owner: re-vendorear el build v0.8.0 en Coffer y migrar su grid.
-- **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
-  in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
-  (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
-  Coffer/Craft: **v0.3.0 lista para vendorear** (build con scripts/build-embed.ps1); al
-  re-vendorear, que `Craft.Reactive.isCallable`/`isWritableSignal` deleguen en los predicados.
+- **3 FR de Coffer CERRADOS + RELEASE v0.9.0** (2026-08-27, **ADR-0011**): los tres FR que
+  quedaban abiertos en `docs/BACKLOG.md`, todos levantados por Coffer usándonos de verdad.
+  Entregado, con **default = comportamiento previo** en los tres (la suite previa entera siguió
+  verde sin tocarla):
+  - **`tw:snap(value)`** (`wow/Anim.lua`, FR 2026-08-23): teletransporta y **SIGUE** apuntando al
+    destino — re-arranca desde ahí si queda camino, se desarma si `value` ya ES el destino.
+    **Decisión del owner contra la letra del FR** (que pedía teletransportar y desarmar): la
+    versión literal no resolvía el caso real, porque la señal de Coffer ya vale 1 y el fade-in
+    habría seguido exigiendo el ping-pong. Así una sola operación cubre fade-in y "saltar al
+    final", y se preserva la invariante «un tween nunca reposa en un valor distinto de su
+    destino». +10 tests.
+  - **`virtual:Resize{ width?, height?, columns? }`** + azúcar `SetViewport` /
+    `SetViewportHeight` / `SetColumns` (FR 2026-08-26/27). El owner pidió el **FR completo**, no
+    el subset de solo-alto. Implementado **reactivamente**: el viewport es una señal interna que
+    lee el effect de ventaneo, así que `Resize` solo la fija y todo re-planifica y repinta por el
+    camino que ya existía (nada de un camino imperativo paralelo). **Combate = salida (a)**: la
+    geometría se aplica siempre en el acto; solo se difiere **crear** filas, con aviso único y
+    catch-up en `PLAYER_REGEN_ENABLED` — vigía compartido perezoso, copiado del idioma de `each`.
+    Encoger nunca crea nada y el pool **solo crece** (filas sobrantes ocultas y reusadas: sin
+    churn en el arrastre). +17 tests.
+  - **`virtual` gana `opts.indentOf(entry) → px`** (FR 2026-08-26): sangría **por fila**
+    (variante 2, decisión del owner) — un solo `render` sirve a todos los niveles. Bajan las
+    **COLUMNAS**, no el tamaño de celda (`floor((ancho_útil − indent)/colWidth)`, mínimo 1); un
+    cambio de sangría rompe la fila abierta; las filas de ancho completo también se insetan y
+    encogen (decisión del owner). El core sigue puro: `_flowLayout` recibe `indent`/`columns` ya
+    masticados por el ui. **Consecuencia asumida y anotada: el nº de columnas deja de ser global
+    en `core/Flow.lua`** — tenerlo presente al tocar ese archivo. +12 tests.
+  - Gates verdes: suite **333** (+39), luacheck **0/0** (15 archivos de lib + demos), taintlint
+    **0 err / 0 warn** (los 4 INFO son los preexistentes: 2 SV010 de Demo.lua + 2 SV011 del Loom
+    vendoreado). Docs: ADR-0011, API-v0 §2/§4, CRAFT-INTEGRATION §4.6/§4.7 (de paso se corrigió
+    la nota obsoleta de §4.7 que aún decía que las cabeceras heterogéneas eran de "una release
+    futura"), BACKLOG (3 FR a Cerrados; la sección de abiertos queda **vacía**), changelog §10
+    v0.18. bump `.toc` 0.9.0 + LibStub MINOR **10** + `_VERSION`.
+  - **Demos ampliadas**: `/weavetween <0-100>` (fade-in con `snap`) y `/weavetween now <0-100>`
+    (salto seco); `/weavegroups` gana la categoría "Armor" con **dos sub-secciones sangradas** y
+    un **grip de redimensionado real** en la esquina inferior derecha (arrastrar → `Resize` en
+    cada frame, sin `/reload` y sin recrear pools).
+  - **VERIFICADO IN-GAME** por el owner (2026-08-27): `/weavetween` (fade-in con `snap` y salto
+    seco con `now`) y `/weavegroups` (sub-secciones sangradas + grip de redimensionado continuo)
+    OK. Las tres features del ADR-0011 funcionan end-to-end en 12.0.7.
+  - **`scripts/deploy-local.bat` NUEVO** (2026-08-27): wrapper del `.ps1` con
+    `-ExecutionPolicy Bypass` (por proceso, no toca la política del sistema) — la máquina Windows
+    del owner tiene la ejecución de scripts deshabilitada y `powershell -File` falla con
+    `UnauthorizedAccess`. `build-embed.ps1` tiene el mismo bloqueo: usar la misma receta.
+  - **PENDIENTE (owner)**: (1) commit + merge `dev`→`main` + tag `v0.9.0` + `git push` (Claude no
+    commitea ni pushea salvo petición explícita); (2) re-vendorear el build v0.9.0 en Coffer y
+    retirar allí sus tres fallbacks (ping-pong de `WinBody.lua`, reconstrucción del grid en
+    `onResized`, banda de color que simulaba jerarquía) + quitar el aviso de `/reload` de los
+    deslizadores de Ajustes.
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a
