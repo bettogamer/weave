@@ -301,6 +301,17 @@ craftScrollbar.onChange = function(px) scroll:set(px) end                      -
   would read as "these items are smaller". A change of indent breaks the open row, and
   full-width rows are inset and narrowed too, so a sub-header hangs aligned with its own
   items. Heterogeneous mode only; default 0.
+- **In-line sub-groups — `opts.segmentOf` / `segmentGap` / `segmentLabel` (v0.10+).** Runs of
+  consecutive grid entries with the same key become blocks (a label ABOVE their cells) that
+  share a row, `segmentGap` px apart; a block that doesn't fit opens a row, one wider than a
+  row wraps from x=0. `segmentLabel = { height, render = function(info) → frame }` renders
+  once per pooled label; `info` is a signal of `{ key, entry, first, count, width }`. Paint
+  any divider from the label — the gap is left free. To size a window from its content, use
+  `Weave.flowPlan(list, sameOpts)`: it runs the very same planner the grid paints with.
+- **It sleeps while hidden (v0.10+).** Nothing to wire: hiding the viewport (or any ancestor)
+  stops re-planning and repainting, and — since an unobserved `computed` no longer recomputes —
+  your stream pipeline stops too. Showing it catches up against the current values. Don't
+  read `contentHeight()` of a hidden grid to size things; use `Weave.flowPlan`.
 - Create it inside the component's scope (§4.2) so it disposes with the instance.
 
 ## 5. Taint rules (WoW 12.0+ secret values)

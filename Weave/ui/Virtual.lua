@@ -171,7 +171,29 @@ function VirtualMethods:_initHetero(opts)
     self._pools[name]  = {}
     self._cursor[name] = 0
   end
+  -- Segments (FR Coffer 2026-10-26): labels get their OWN pool — a label frame is
+  -- never a cell — sized like the grid pools, O(visible).
+  self._segmentOf    = opts.segmentOf
+  self._segmentGap   = opts.segmentGap or 0
+  self._segmentLabel = opts.segmentLabel
+  self._labelPool    = {}
   self:_ensurePools()
+end
+
+-- Bakes one pooled label: a fresh `info` signal + one render run, in the instance scope.
+function VirtualMethods:_materializeLabel(render)
+  local label
+  self._scope:run(function()
+    local infoSig = Weave.signal(nil)
+    label = render(infoSig)
+    if type(label) ~= "table" or not label.SetParent then
+      error("Weave.virtual: segmentLabel.render must return a frame", 0)
+    end
+    label:SetParent(self._container)
+    label._weaveInfo = infoSig
+    label:Hide()
+  end)
+  return label
 end
 
 -- One pool per type, each sized to the WORST-CASE visible count of that type (bounded
@@ -180,9 +202,11 @@ end
 -- indented band packs fewer per row. Grows only — see _ensureCapacity.
 function VirtualMethods:_ensurePools()
   local inCombat, short = InCombatLockdown(), false
+  local minGridH
   for name, spec in pairs(self._types) do
     local rows = ceil(self._viewportH / spec.height) + 1
     local want = spec.grid and rows * self._columns or rows
+    if spec.grid and (not minGridH or spec.height < minGridH) then minGridH = spec.height end
     local pool = self._pools[name]
     if #pool < want then
       if inCombat then
@@ -192,47 +216,37 @@ function VirtualMethods:_ensurePools()
       end
     end
   end
+  -- Worst case: every visible grid row full of one-cell segments, each labelled.
+  if self._segmentLabel and minGridH then
+    local want = (ceil(self._viewportH / minGridH) + 1) * self._columns
+    local pool = self._labelPool
+    if #pool < want then
+      if inCombat then
+        short = true
+      else
+        for p = #pool + 1, want do pool[p] = self:_materializeLabel(self._segmentLabel.render) end
+      end
+    end
+  end
   if short then self:_deferGrowth() end
 end
 
 -- O(total): walk the stream into the pure per-entry descriptor + the flow layout. Only
 -- runs when the source array identity changes (data changed), never per scroll.
+-- Descriptors and geometry come from the same core helpers Weave.flowPlan uses, so a
+-- consumer's estimate can never drift from what is painted.
 function VirtualMethods:_rebuildLayout(list)
-  if type(list) ~= "table" then
-    error("Weave.virtual: source must provide an array, got " .. type(list), 0)
-  end
-  local desc, entryType = {}, {}
-  local usableW = self._viewportW - 2 * self._padH
-  for i = 1, #list do
-    local t = self._typeOf(list[i])
-    local spec = self._types[t]
-    if not spec then
-      error("Weave.virtual: typeOf returned unknown type '" .. tostring(t) .. "'", 0)
-    end
-    desc[i] = { grid = spec.grid or false, height = spec.height }
-    -- Indent (FR Coffer 2026-08-26): the cell KEEPS its width and the band loses
-    -- columns — indented cells must measure the same as their siblings above, or the
-    -- indent reads as "these items are smaller". Core gets both numbers ready-made.
-    if self._indentOf then
-      local indent = self._indentOf(list[i])
-      if type(indent) ~= "number" or indent < 0 then
-        error("Weave.virtual: opts.indentOf must return a number >= 0, got "
-          .. tostring(indent), 0)
-      end
-      if indent > 0 then
-        desc[i].indent = indent
-        if desc[i].grid then
-          local cols = floor((usableW - indent) / self._colWidth)
-          desc[i].columns = cols >= 1 and cols or 1 -- always room for at least one
-        end
-      end
-    end
-    entryType[i] = t
-  end
-  self._layout = Weave._flowLayout(desc, {
+  local geo = Weave._flowGeometry({
     columns = self._columns, spacing = self._spacing,
-    padTop = self._padV, padBottom = self._padV,
+    paddingH = self._padH, paddingV = self._padV,
+    segmentGap = self._segmentGap, segmentLabel = self._segmentLabel,
+  }, self._viewportW)
+  local desc, entryType = Weave._flowDescribe(list, {
+    who = "Weave.virtual", typeOf = self._typeOf, types = self._types,
+    indentOf = self._indentOf, segmentOf = self._segmentOf,
+    colWidth = geo.colWidth, width = geo.width,
   })
+  self._layout = Weave._flowLayout(desc, geo)
   self._entryType = entryType
   self._contentHeight:set(self._layout.contentHeight)
 end
@@ -249,27 +263,25 @@ function VirtualMethods:_paintHetero()
   local vis = Weave._flowVisible(layout, scroll, self._viewportH)
   for name in pairs(self._pools) do self._cursor[name] = 0 end
 
-  local visible = {}
+  local visible, labels = {}, {}
+  local colW = self._colWidth
   for r = vis.first, vis.last do
     local row = layout.rows[r]
-    for j = row.first, row.first + row.count - 1 do
-      local t     = self._entryType[j]
-      local grid  = self._types[t].grid
-      local c     = self._cursor[t] + 1
-      self._cursor[t] = c
-      local frame = self._pools[t][c]
-      if frame then
-        frame._weaveItem:set(list[j])
-        frame._weaveIndex:set(j)
-        frame:ClearAllPoints()
-        local x = self._padH + row.indent + (grid and (j - row.first) * self._colWidth or 0)
-        frame:SetPoint("TOPLEFT", self._container, "TOPLEFT", x, scroll - row.y)
-        if not grid then -- full-width row: virtual owns its size (the layout's authority)
-          frame:SetWidth(self._viewportW - 2 * self._padH - row.indent)
-          frame:SetHeight(self._types[t].height)
+    local rowY = scroll - row.y
+    local bandX = self._padH + row.indent
+    if row.segs then
+      -- Segmented row: cells sit at their segment's x and cellY below the labels.
+      for _, seg in ipairs(row.segs) do
+        for j = seg.first, seg.first + seg.count - 1 do
+          self:_place(list, j, bandX + seg.x + (j - seg.first) * colW, rowY - row.cellY, visible)
         end
-        frame:Show()
-        visible[#visible + 1] = frame
+        if seg.label and self._segmentLabel then self:_placeLabel(list, seg, bandX + seg.x, rowY, labels) end
+      end
+    else
+      for j = row.first, row.first + row.count - 1 do
+        local grid = self._types[self._entryType[j]].grid
+        self:_place(list, j, bandX + (grid and (j - row.first) * colW or 0), rowY, visible,
+          row.indent)
       end
     end
   end
@@ -280,13 +292,67 @@ function VirtualMethods:_paintHetero()
       pool[p]:Hide()
     end
   end
-  self._container._virtualRows = visible
+  for p = #labels + 1, #self._labelPool do
+    self._labelPool[p]._weaveInfo:set(nil)
+    self._labelPool[p]:Hide()
+  end
+  self._container._virtualRows   = visible
+  self._container._virtualLabels = labels
+end
+
+-- Fills the next pooled frame of entry j's type and anchors it at (x, y). `indent` is
+-- only read for full-width rows, whose size virtual owns (the layout's authority).
+function VirtualMethods:_place(list, j, x, y, visible, indent)
+  local t = self._entryType[j]
+  local c = self._cursor[t] + 1
+  self._cursor[t] = c
+  local frame = self._pools[t][c]
+  if not frame then return end -- pool short (grew in combat): paint what there is
+  frame._weaveItem:set(list[j])
+  frame._weaveIndex:set(j)
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", self._container, "TOPLEFT", x, y)
+  if not self._types[t].grid then
+    frame:SetWidth(self._viewportW - 2 * self._padH - (indent or 0))
+    frame:SetHeight(self._types[t].height)
+  end
+  frame:Show()
+  visible[#visible + 1] = frame
+end
+
+-- Fills the next pooled label for a segment's first stretch. `info` only changes when
+-- the label now shows another segment or width, so scrolling doesn't re-run its binds.
+function VirtualMethods:_placeLabel(list, seg, x, y, labels)
+  local label = self._labelPool[#labels + 1]
+  if not label then return end
+  local width = seg.count * self._colWidth
+  local info  = label._weaveInfo:peek()
+  local entry = list[seg.first]
+  if not info or info.key ~= seg.key or info.first ~= seg.first or info.entry ~= entry
+    or info.count ~= seg.total or info.width ~= width then
+    label._weaveInfo:set({ key = seg.key, entry = entry, first = seg.first,
+      count = seg.total, width = width })
+  end
+  label:ClearAllPoints()
+  label:SetPoint("TOPLEFT", self._container, "TOPLEFT", x, y)
+  label:SetWidth(width)
+  label:SetHeight(self._segmentLabel.height)
+  label:Show()
+  labels[#labels + 1] = label
 end
 
 -- The windowing effect body, mode-specific. Reads the reactive source and scroll so the
 -- enclosing effect re-runs on any change; the O(total) layout rebuild is cached by array
 -- identity, so scrolling only repaints.
+--
+-- Asleep (viewport not visible, FR Coffer 2026-09-02) it returns BEFORE reading the
+-- source, the scroll or the geometry: the effect re-tracks on every run, so it lets go
+-- of all three and no change reaches it — nor, with nobody else reading it, the
+-- source's own computed pipeline (ADR-0012). Waking re-runs it against the CURRENT
+-- values. The very first pass always runs, so contentHeight is valid from birth.
 function VirtualMethods:_drive()
+  if not self._awake() and self._primed then return end
+  self._primed = true
   self._geom() -- track the viewport/columns signal: Resize re-runs this effect
   if self._hetero then
     local list = self._listGet()
@@ -418,6 +484,16 @@ function Weave._materializeVirtual(container, d)
     inst._scope:dispose()
   end })
 
+  -- Sleep while nobody can see it: OnShow/OnHide also fire when an ANCESTOR toggles,
+  -- and IsVisible() (not IsShown) is the truth. HookScript, never SetScript: the
+  -- consumer's own handlers stay theirs. Hooks can't be removed — dispose mutes them.
+  inst._awake = Weave.signal(container:IsVisible() and true or false)
+  local function syncAwake()
+    if not inst._disposed then inst._awake:set(container:IsVisible() and true or false) end
+  end
+  container:HookScript("OnShow", syncAwake)
+  container:HookScript("OnHide", syncAwake)
+
   -- Windowing effect: tracks the reactive source and scroll; re-glazes on change.
   inst._scope:run(function()
     Weave.effect(function() inst:_drive() end)
@@ -483,6 +559,30 @@ function Weave.virtual(source, opts)
     end
     if type(opts.indentOf) ~= "function" then
       error("Weave.virtual: opts.indentOf must be a function, got " .. type(opts.indentOf), 2)
+    end
+  end
+
+  if opts.segmentOf ~= nil then
+    if opts.types == nil then
+      error("Weave.virtual: opts.segmentOf requires opts.types (segments are a "
+        .. "heterogeneous-flow feature: they pack runs of grid cells in line)", 2)
+    end
+    if type(opts.segmentOf) ~= "function" then
+      error("Weave.virtual: opts.segmentOf must be a function, got " .. type(opts.segmentOf), 2)
+    end
+  end
+  if opts.segmentGap ~= nil and (type(opts.segmentGap) ~= "number" or opts.segmentGap < 0) then
+    error("Weave.virtual: opts.segmentGap must be a number >= 0", 2)
+  end
+  if opts.segmentLabel ~= nil then
+    if opts.segmentOf == nil then
+      error("Weave.virtual: opts.segmentLabel requires opts.segmentOf", 2)
+    end
+    local l = opts.segmentLabel
+    if type(l) ~= "table" or type(l.render) ~= "function"
+      or type(l.height) ~= "number" or l.height <= 0 then
+      error("Weave.virtual: opts.segmentLabel must be { height = number > 0, "
+        .. "render = function(info) -> frame }", 2)
     end
   end
 

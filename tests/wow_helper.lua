@@ -14,6 +14,46 @@ M.isFakeSecret  = core.isFakeSecret
 
 local frames -- every mock frame created since the last loadWeaveWow()
 
+-- Effective visibility, like the client: shown AND every ancestor shown.
+local function isVisible(f)
+  while f do
+    if not f._shown then return false end
+    f = f._parent
+  end
+  return true
+end
+
+local function isDescendant(f, ancestor)
+  local p = f._parent
+  while p do
+    if p == ancestor then return true end
+    p = p._parent
+  end
+  return false
+end
+
+local function fireScript(f, handler)
+  local fn = f._scripts[handler]
+  if fn then fn(f) end
+  for _, hook in ipairs(f._hooks[handler] or {}) do hook(f) end
+end
+
+-- Show/Hide fire OnShow/OnHide on the frame AND on every descendant whose effective
+-- visibility flipped (the client propagates them the same way).
+local function setShown(f, v)
+  local affected = { f }
+  for _, other in ipairs(frames or {}) do
+    if isDescendant(other, f) then affected[#affected + 1] = other end
+  end
+  local before = {}
+  for i, a in ipairs(affected) do before[i] = isVisible(a) end
+  f._shown = v
+  for i, a in ipairs(affected) do
+    local vis = isVisible(a)
+    if vis ~= before[i] then fireScript(a, vis and "OnShow" or "OnHide") end
+  end
+end
+
 local function newFrame(frameType, name, parent, template)
   local f = {
     -- creation args, recorded for the Weave.new specs
@@ -32,9 +72,18 @@ local function newFrame(frameType, name, parent, template)
   function f:UnregisterEvent(event) self._events[event] = nil end
   function f:SetScript(handler, fn) self._scripts[handler] = fn end
   function f:GetScript(handler) return self._scripts[handler] end
-  function f:Hide() self._shown = false end
-  function f:Show() self._shown = true end
+  -- HookScript runs AFTER the SetScript handler, and survives later SetScript calls
+  -- (like the client): the consumer's own OnShow/OnHide are never clobbered.
+  f._hooks = {}
+  function f:HookScript(handler, fn)
+    local list = self._hooks[handler] or {}
+    list[#list + 1] = fn
+    self._hooks[handler] = list
+  end
+  function f:Hide() setShown(self, false) end
+  function f:Show() setShown(self, true) end
   function f:IsShown() return self._shown end
+  function f:IsVisible() return isVisible(self) end
   function f:SetParent(p) self._parent = p end
   function f:GetParent() return self._parent end
   function f:SetSize(w, h) self._size = { w, h } end

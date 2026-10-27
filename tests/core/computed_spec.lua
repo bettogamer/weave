@@ -117,3 +117,82 @@ describe("Weave.computed (fórmulas derivadas)", function()
   end)
 
 end)
+
+-- Bloque A (FR Coffer 2026-09-02, ADR-0012): un computed que NADIE observa no trabaja.
+-- Antes la cola recalculaba todo computed sucio aunque nadie lo leyera; ahora, si una
+-- dependencia cambia y el computed no tiene observadores en ese instante, se queda
+-- SUCIO (O(1)) y suelta sus dependencias: no necesita más avisos, la próxima lectura
+-- lo recalcula contra el valor ACTUAL. Con observadores, todo sigue igual (empuje).
+describe("Weave.computed sin observadores (perezoso de verdad)", function()
+
+  it("leído a mano (sin effect), un cambio de dependencia NO lo recalcula", function()
+    local W = helper.loadWeave()
+    local hp = W.signal(1)
+    local calls = 0
+    local c = W.computed(function() calls = calls + 1 return hp() * 10 end)
+    assert_eq(c(), 10)
+    hp:set(2); hp:set(3); hp:set(4)
+    assert_eq(calls, 1, "nadie lo observa: tres cambios, cero recálculos")
+    assert_eq(c(), 40, "pero la siguiente lectura ve el valor actual")
+    assert_eq(calls, 2, "y paga UN recálculo, no tres")
+  end)
+
+  it("peek() también lo pone al día", function()
+    local W = helper.loadWeave()
+    local hp = W.signal(1)
+    local c = W.computed(function() return hp() + 1 end)
+    c()
+    hp:set(9)
+    assert_eq(c:peek(), 10)
+  end)
+
+  it("con un effect observándolo sigue siendo de empuje: recalcula y avisa", function()
+    local W = helper.loadWeave()
+    local hp = W.signal(1)
+    local calls, seen = 0, nil
+    local c = W.computed(function() calls = calls + 1 return hp() * 2 end)
+    W.effect(function() seen = c() end)
+    hp:set(5)
+    assert_eq(calls, 2)
+    assert_eq(seen, 10, "el effect se enteró sin que nadie leyera a mano")
+  end)
+
+  it("cuando su último effect deja de leerlo, vuelve a ser perezoso", function()
+    local W = helper.loadWeave()
+    local hp, awake = W.signal(1), W.signal(true)
+    local calls = 0
+    local c = W.computed(function() calls = calls + 1 return hp() end)
+    W.effect(function() if awake() then c() end end)
+    assert_eq(calls, 1)
+    awake:set(false)            -- el effect ya no lee c (re-traquea en cada pasada)
+    hp:set(2); hp:set(3)
+    assert_eq(calls, 1, "dormido, el pipeline de arriba no se recalcula")
+    awake:set(true)             -- al despertar lee el valor ACTUAL
+    assert_eq(calls, 2)
+    assert_eq(c(), 3)
+  end)
+
+  it("en cadena (A → B) la pereza sube: tras soltarse, A deja de recalcularse", function()
+    local W = helper.loadWeave()
+    local src = W.signal(1)
+    local aCalls, bCalls = 0, 0
+    local a = W.computed(function() aCalls = aCalls + 1 return src() + 1 end)
+    local b = W.computed(function() bCalls = bCalls + 1 return a() * 2 end)
+    assert_eq(b(), 4)
+    for v = 2, 6 do src:set(v) end
+    assert_true(aCalls <= 2, "a lo sumo un recálculo de más por nivel (fue " .. aCalls .. ")")
+    assert_eq(bCalls, 1, "B nadie lo observa: no se recalcula")
+    assert_eq(b(), 14, "la lectura reconstruye la cadena con el valor actual")
+  end)
+
+  it("re-ejecutar un effect NO ensucia sus computeds (no se recalculan sin cambios)", function()
+    local W = helper.loadWeave()
+    local hp, other = W.signal(1), W.signal(0)
+    local calls = 0
+    local c = W.computed(function() calls = calls + 1 return hp() end)
+    W.effect(function() c(); other() end)
+    other:set(1); other:set(2) -- el effect se re-ejecuta, c no cambió
+    assert_eq(calls, 1, "soltar y re-coger deps en la misma pasada no cuenta como 'sin observadores'")
+  end)
+
+end)

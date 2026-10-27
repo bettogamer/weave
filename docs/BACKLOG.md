@@ -14,11 +14,30 @@
 
 ## Solicitado desde el uso real (FR de consumidores)
 
-_(vacío — ver Cerrados)_
-
+_(vacío — los dos FR de Coffer se cerraron el 2026-10-26, ADR-0012)_
 
 ## Cerrados
 
+- **`Weave.virtual`: pausar cuando su frame NO está a la vista** — ✅ **CERRADO 2026-10-26**
+  (pedido por **Coffer 2026-09-02**, revisión de rendimiento; ADR-0012). Una ventana cerrada de
+  Coffer seguía pagando en cada `BAG_UPDATE` el pipeline del stream, la replanificación y el
+  repintado. **Resuelto en dos capas:** (1) `virtual` duerme **automáticamente** (decisión del
+  owner, sin `opts.enabled`): `HookScript` a `OnShow`/`OnHide` del viewport + `IsVisible()`;
+  dormido no lee fuente/scroll/geometría y al despertar reconcilia contra el valor ACTUAL.
+  (2) **Hallazgo al diseñar**: eso solo no paraba el pipeline, porque la cola del core recalculaba
+  todo `computed` sucio aunque nadie lo leyera. Ahora un `computed` sin observadores queda sucio
+  y suelta sus deps (pereza que sube por la cadena) — cambio de core aprobado por el owner.
+  **Coffer puede retirar su apaño** (la señal `visible` leída primero por los computeds del stream).
+- **`Weave.virtual`: segmentos en línea dentro de una fila de grid** — ✅ **CERRADO 2026-10-26**
+  (pedido por **Coffer 2026-10-26**, variante "B · Subgrupos en fila"; ADR-0012). **Resuelto** con
+  `opts.segmentOf` / `segmentGap` / `segmentLabel = { height, render(info) → frame }` (rótulo en
+  idioma Weave — render una vez por marco de un pool propio, `info` = señal `{ key, entry, first,
+  count, width }` — decisión del owner frente al `create`/`render` imperativo del FR). Empaquetado
+  en px en `core/Flow.lua`; envoltura desde x=0 con rótulo solo en el 1er tramo; filas con rótulo
+  = `labelHeight + celda`. Sin separador incorporado (el hueco queda libre). Planificador público
+  **`Weave.flowPlan(list, opts)`** con las mismas opts y el mismo código que la ui, para el `fitHeight`
+  de Coffer. Pendiente en Coffer: `List.lua` `emitSub` deja de emitir sub-cabeceras y marca el
+  segmento; `WinBody.lua` pasa `fitHeight` a `Weave.flowPlan`.
 - **`Weave.tween`: saltar a un valor sin interpolar (`:snap`)** — ✅ **CERRADO 2026-08-27**
   (pedido por **Coffer 2026-08-23**, fundido del grid al cambiar de filtro; ADR-0011). El tween
   solo sabía interpolar *desde donde está*, así que el *fade-in* —el patrón de aparición más

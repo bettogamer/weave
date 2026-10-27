@@ -461,3 +461,140 @@ describe("Weave.virtual: Resize en combate (crecer se difiere, encoger no)", fun
   end)
 
 end)
+
+-- Bloque B (FR Coffer 2026-09-02, ADR-0012): un virtual que nadie mira no trabaja.
+-- Automático: virtual se engancha (HookScript, sin pisar al consumidor) a OnShow/OnHide
+-- de su viewport y mira IsVisible(). Dormido, el effect de ventaneo sale sin leer ni
+-- la fuente ni el scroll (deja de trackearlos); al despertar reconcilia contra el
+-- valor ACTUAL de la fuente, no contra el que tenía al dormirse.
+describe("Weave.virtual: se pausa cuando su viewport no está a la vista", function()
+
+  local function live(W, opts)
+    local box = W.new("Frame", { size = { 80, 100 } })
+    local src = W.signal(seq(100))
+    local o = { parent = box, viewport = { 80, 100 }, rowHeight = 20, render = numberRow(W) }
+    for k, v in pairs(opts or {}) do o[k] = v end
+    return box, src, W.virtual(src, o)
+  end
+
+  local function reversed(n)
+    local t = {}
+    for i = 1, n do t[i] = n - i + 1 end
+    return t
+  end
+
+  it("oculto, un cambio de la fuente no replanifica ni repinta", function()
+    local W = helper.loadWeaveWow()
+    local box, src, inst = live(W)
+    box:Hide()
+    src:set(reversed(10))
+    assert_eq(box._virtualRows[1]._set.text, "1", "la fila sigue con el dato de antes")
+    assert_eq(inst:contentHeight(), 2000, "ni siquiera re-anuncia el alto")
+  end)
+
+  it("al volver a mostrarse se pone al día contra el valor ACTUAL", function()
+    local W = helper.loadWeaveWow()
+    local box, src, inst = live(W)
+    box:Hide()
+    src:set(reversed(10))
+    src:set(reversed(3))      -- el último gana: nada de reproducir la historia
+    box:Show()
+    assert_eq(box._virtualRows[1]._set.text, "3")
+    assert_eq(#box._virtualRows, 3)
+    assert_eq(inst:contentHeight(), 60)
+  end)
+
+  it("ocultar un ANCESTRO también lo duerme (IsVisible, no IsShown)", function()
+    local W = helper.loadWeaveWow()
+    local win = W.new("Frame", { size = { 80, 100 } })
+    local box = W.new("Frame", { parent = win, size = { 80, 100 } })
+    local src = W.signal(seq(100))
+    W.virtual(src, { parent = box, viewport = { 80, 100 }, rowHeight = 20, render = numberRow(W) })
+    win:Hide()                -- la ventana de Coffer se cierra; el viewport sigue IsShown()
+    src:set(reversed(10))
+    assert_eq(box._virtualRows[1]._set.text, "1")
+    win:Show()
+    assert_eq(box._virtualRows[1]._set.text, "10")
+  end)
+
+  it("no pisa los OnShow/OnHide del consumidor (se engancha con HookScript)", function()
+    local W = helper.loadWeaveWow()
+    local box, src = live(W)
+    local shows = 0
+    box:SetScript("OnShow", function() shows = shows + 1 end) -- incluso puesto DESPUÉS
+    box:Hide()
+    src:set(reversed(5))
+    box:Show()
+    assert_eq(shows, 1, "el script del consumidor sigue corriendo")
+    assert_eq(box._virtualRows[1]._set.text, "5", "y el virtual despertó igual")
+  end)
+
+  it("nace oculto: la primera pasada se hace igual (contentHeight válido desde el nacimiento)", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 80, 100 } })
+    box:Hide()
+    local inst = W.virtual(seq(100), {
+      parent = box, viewport = { 80, 100 }, rowHeight = 20, render = numberRow(W),
+    })
+    assert_eq(inst:contentHeight(), 2000)
+  end)
+
+  it("scrollear dormido tampoco repinta; al despertar respeta el scroll actual", function()
+    local W = helper.loadWeaveWow()
+    local scroll = W.signal(0)
+    local box = live(W, { scroll = scroll })
+    box:Hide()
+    scroll:set(40)
+    assert_eq(box._virtualRows[1]._set.text, "1")
+    box:Show()
+    assert_eq(box._virtualRows[1]._set.text, "3", "scroll 40 / stride 20 → arranca en la 3ª")
+  end)
+
+  it("Resize mientras duerme se aplica al despertar", function()
+    local W = helper.loadWeaveWow()
+    local box, _, inst = live(W)
+    box:Hide()
+    inst:Resize({ columns = 2 })
+    box:Show()
+    assert_eq(lastPoint(box._virtualRows[2])[4], 40, "colWidth 80/2 = 40 al despertar")
+    assert_eq(inst:contentHeight(), 1000)
+  end)
+
+  it("el caso Coffer de punta a punta: dormido, el computed del stream NO se recalcula", function()
+    local W = helper.loadWeaveWow()
+    local rev = W.signal(0)   -- ns.rev.* de Coffer: se re-publica en cada BAG_UPDATE
+    local calls = 0
+    local stream = W.computed(function() calls = calls + 1; rev(); return seq(50) end)
+    local box = W.new("Frame", { size = { 80, 100 } })
+    W.virtual(stream, { parent = box, viewport = { 80, 100 }, rowHeight = 20, render = numberRow(W) })
+    assert_eq(calls, 1)
+    box:Hide()
+    for v = 1, 5 do rev:set(v) end
+    assert_true(calls <= 2, "a lo sumo un recálculo hasta que se suelta (fue " .. calls .. ")")
+    local asleep = calls
+    rev:set(6)
+    assert_eq(calls, asleep, "y desde ahí, cero: el pipeline de una ventana cerrada no corre")
+    box:Show()
+    assert_eq(calls, asleep + 1, "al abrir, una pasada contra el valor actual")
+  end)
+
+  it("también duerme en modo heterogéneo (types)", function()
+    local W = helper.loadWeaveWow()
+    local box = W.new("Frame", { size = { 60, 100 } })
+    local typeCalls = 0
+    local src = W.signal({ 1, 2, 3 })
+    W.virtual(src, {
+      parent = box, viewport = { 60, 100 }, columns = 3,
+      typeOf = function() typeCalls = typeCalls + 1 return "item" end,
+      types = { item = { grid = true, height = 20, render = numberRow(W) } },
+    })
+    local before = typeCalls
+    box:Hide()
+    src:set({ 4, 5, 6, 7 })
+    assert_eq(typeCalls, before, "oculto no recorre el stream (O(total)) ni replanifica")
+    box:Show()
+    assert_eq(#box._virtualRows, 4)
+    assert_eq(box._virtualRows[1]._set.text, "4")
+  end)
+
+end)

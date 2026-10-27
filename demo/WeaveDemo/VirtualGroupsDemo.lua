@@ -11,6 +11,10 @@
 --                          both levels — "Armor" holds "Plate"/"Mail" one step in.
 --   * resize grip        → inst:Resize{...} on a LIVE list: drag the corner and the grid
 --                          re-plans every frame, no rebuild and no /reload.
+--   * segments           → opts.segmentOf: "Binds" splits into sub-groups that sit IN
+--                          LINE, each a label above its cells; the long one wraps.
+--   * sleeps when hidden → /weavegroups hide, then tick: the stream computed does NOT
+--                          re-run while nobody can see the list; show catches up once.
 --
 -- Collapse the categories and watch the grid reflow — virtual just paints whatever flat
 -- stream the computed produces.
@@ -31,21 +35,40 @@ local CATS = {
     { id = "armor/mail",  name = "Mail",  n = 8 },
   } },
   { id = "misc",    name = "Misc",        n = 7  },
+  -- Binds is split into in-line SEGMENTS (opts.segmentOf), not indented sub-headers.
+  { id = "binds",   name = "Binds",       n = 12, segs = {
+    { key = "Warbound until equipped", n = 1 },
+    { key = "Warbound (Soulbound)",    n = 1 },
+    { key = "Binds when picked up",    n = 10 },
+  } },
 }
 local collapsed = W.signal({}) -- { [catId] = true }
 local scroll    = W.signal(0)  -- px; wheel AND the scrollbar move it
 local geom      = W.signal(0)  -- bumped by the resize grip so OUR effects re-run too
+local rev       = W.signal(0)  -- stands in for Coffer's BAG_UPDATE revision
+local streamRuns = 0           -- how many times the stream formula ran (sleep check)
 
 -- STREAM: header + (unless collapsed) its items. A computed over `collapsed`, so toggling
 -- a category produces a NEW flat stream and virtual re-windows. This is the whole trick:
 -- collapse is just "a different stream", the consumer's business — not virtual's.
 local stream = W.computed(function()
+  streamRuns = streamRuns + 1
+  rev()
   local closed = collapsed()
   local out = {}
   for _, c in ipairs(CATS) do
     out[#out + 1] = { kind = "header", cat = c }
     if not closed[c.id] then
-      if c.subs then
+      if c.segs then
+        -- Consecutive items with the same `seg` key form one in-line segment.
+        local k = 0
+        for _, sg in ipairs(c.segs) do
+          for _ = 1, sg.n do
+            k = k + 1
+            out[#out + 1] = { kind = "item", cat = c.id, k = k, seg = sg.key }
+          end
+        end
+      elseif c.subs then
         -- Sub-sections are the SAME type one level deeper: the indent travels with the
         -- ROW (opts.indentOf), not with the type, so no "headerIndented" recipe exists.
         for _, sc in ipairs(c.subs) do
@@ -115,6 +138,22 @@ local function renderItem(item)
   })
 end
 
+-- Segment label: rendered ONCE per pooled label; info() carries the segment's key.
+-- virtual sizes it to the stretch, so the FontString truncates on its own.
+local function renderLabel(info)
+  return W.new("Frame", {
+    [W.children] = {
+      W.new("FontString", {
+        layer = "OVERLAY", points = { { "TOPLEFT" }, { "BOTTOMRIGHT" } },
+        template = "GameFontDisableSmall",
+        text = W.computed(function()
+          local v = info(); return v and (v.key .. " (" .. v.count .. ")") or ""
+        end),
+      }),
+    },
+  })
+end
+
 -- PANEL + viewport (virtual clips the viewport; title/scrollbar are siblings, not children).
 local panel = W.new("Frame", {
   name = "WeaveGroupsDemo", point = { "CENTER", -330, 0 }, size = { VIEWW + SBW + 30, VIEWH + 40 },
@@ -141,6 +180,10 @@ local v = W.virtual(stream, {
   -- One step of indent per level: the cells KEEP their size and the band simply fits
   -- fewer columns, so a sub-section reads as hanging off the header above it.
   indentOf = function(e) return (e.depth or 0) * 16 end,
+  -- In-line sub-groups: a label above each run of same-key cells, 8 px between runs.
+  segmentOf    = function(e) return e.seg end,
+  segmentGap   = 8,
+  segmentLabel = { height = 14, render = renderLabel },
   types = {
     item   = { render = renderItem,   height = 38, grid = true }, -- flows in the 4-col grid
     header = { render = renderHeader,  height = 20 },             -- full-width, breaks the flow
@@ -277,10 +320,22 @@ SlashCmdList.WEAVEGROUPS = function(msg)
     collapsed:set({})
   elseif msg == "reset" then
     applySize(160, 320)
+  elseif msg == "hide" then
+    panel:Hide()
+    print("|cffffd100WeaveGroupsDemo:|r hidden — now /weavegroups tick a few times")
+  elseif msg == "show" then
+    panel:Show()
+    print("|cffffd100WeaveGroupsDemo:|r shown — stream runs: " .. streamRuns)
+  elseif msg == "tick" then
+    rev:set(rev:peek() + 1)
+    print("|cffffd100WeaveGroupsDemo:|r tick " .. rev:peek() .. " — stream runs: " .. streamRuns
+      .. (panel:IsVisible() and "" or " (hidden: should stay put)"))
   else
-    print("|cffffd100WeaveGroupsDemo:|r /weavegroups collapse · expand · reset — click a"
+    print("|cffffd100WeaveGroupsDemo:|r /weavegroups collapse · expand · reset · hide · show"
+      .. " · tick — click a"
       .. " header to toggle its group (Armor holds two INDENTED sub-sections); wheel to"
-      .. " scroll; DRAG THE BOTTOM-RIGHT CORNER to resize the live list. The stream is a"
+      .. " scroll; DRAG THE BOTTOM-RIGHT CORNER to resize the live list; Binds shows IN-LINE"
+      .. " segments; hide + tick proves a hidden list does no work. The stream is a"
       .. " computed over one signal; virtual just windows whatever flat stream it gets.")
   end
 end
