@@ -217,6 +217,19 @@
     retirar allí sus tres fallbacks (ping-pong de `WinBody.lua`, reconstrucción del grid en
     `onResized`, banda de color que simulaba jerarquía) + quitar el aviso de `/reload` de los
     deslizadores de Ajustes.
+- **2 FR de Coffer + RELEASE v0.10.0** (2026-10-26, **ADR-0012**, **VERIFICADO IN-GAME** por el
+  owner; LibStub MINOR 11, tag `v0.10.0` sobre main, `git push` lo hace el owner):
+  (1) `virtual` duerme cuando su viewport no se ve (automático, `HookScript` OnShow/OnHide +
+  `IsVisible`) **+ cambio de core**: un `computed` sin observadores ya no se recalcula (queda
+  sucio y suelta deps al recibir el aviso — NUNCA al perder el último observador: los effects
+  sueltan y re-cogen deps en cada pasada). (2) Segmentos en línea `opts.segmentOf`/`segmentGap`/
+  `segmentLabel{height, render(info)}` + **`Weave.flowPlan`** público (mismo código que la ui:
+  `_flowDescribe`/`_flowGeometry`/`_flowLayout` en `core/Flow.lua`). Suite **376**, luacheck 0/0,
+  taintlint 0/0. Demo `/weavegroups` ampliada ("Binds" segmentado; `hide`/`tick`/`show`).
+  Verificado in-game: segmentos en "Binds" y `hide`/`tick`/`show` (oculto, "stream runs" no
+  sube). **PENDIENTE (owner)**: `git push` (main, dev, tag); en Coffer: re-vendorear el build
+  v0.10.0, retirar el apaño de la señal `visible` en los computeds del stream, `emitSub` →
+  segmentos, `fitHeight` → `Weave.flowPlan`.
 - **Pendientes de fondo** (post-M8): (1) ~~verificación in-game de MiOro (M7)~~ ✓ verificado
   in-game por el owner 2026-07-06 (oro con iconos + update reactivo al vender/comprar).
   (2) evaluar **nivel L** (idioma de commits ya decidido: inglés desde 2026-07-06). (3) avisar a

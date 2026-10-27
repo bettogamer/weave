@@ -2,7 +2,7 @@
 ## Title: Lib: Weave-1.0
 ## Notes: Reactive signals for WoW addon UIs: signal -> computed -> bind
 ## Author: Alberto Gomez
-## Version: 0.9.0
+## Version: 0.10.0
 ## X-Category: Library
 
 libs\LibStub\LibStub.lua
