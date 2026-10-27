@@ -229,3 +229,219 @@ describe("Weave._flowLayout: sangría por fila (FR Coffer 2026-08-26)", function
   end)
 
 end)
+
+-- Bloque C (FR Coffer 2026-10-26, ADR-0012): SEGMENTOS en línea dentro de una fila de
+-- grid. Contrato nuevo del descriptor y de las opts (todo opcional; sin `segment` el
+-- planificador se comporta EXACTAMENTE como antes):
+--   items[i].segment = clave|nil — entradas grid CONSECUTIVAS con la misma clave forman
+--                      un segmento (un bloque = rótulo encima + sus celdas).
+--   opts.colWidth, opts.width (ancho útil, ya sin padding), opts.segmentGap (px entre
+--   segmentos), opts.labelHeight (alto del rótulo).
+-- Empaquetado: un segmento va en línea tras el anterior, a `gap` px; si no cabe en lo
+-- que queda de fila abre fila nueva; si es más ancho que la fila entera envuelve desde
+-- x=0 (rótulo solo en el primer tramo). Una fila donde EMPIEZA algún segmento mide
+-- labelHeight + celda y sus celdas bajan cellY = labelHeight; las de continuación, solo
+-- la celda. Cada fila con segmentos lleva
+--   row.segs[s] = { first, count, x, key, label = bool, total }   (x relativa a la banda)
+-- Pasar de entradas sin clave a con clave (o al revés) cierra la fila.
+local function seg(key, h) return { grid = true, height = h or 20, segment = key } end
+local SEG = { columns = 5, colWidth = 20, width = 100, segmentGap = 10, labelHeight = 6 }
+local function segOpts(extra)
+  local o = {}
+  for k, v in pairs(SEG) do o[k] = v end
+  for k, v in pairs(extra or {}) do o[k] = v end
+  return o
+end
+
+describe("Weave._flowLayout: segmentos en línea (FR Coffer 2026-10-26)", function()
+
+  it("dos segmentos caben en la misma fila, separados por el hueco", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ seg("a"), seg("b"), seg("b") }, segOpts())
+    assert_eq(#L.rows, 1)
+    local r = L.rows[1]
+    assert_eq(r.first, 1); assert_eq(r.count, 3)
+    assert_eq(#r.segs, 2)
+    assert_eq(r.segs[1].key, "a"); assert_eq(r.segs[1].x, 0);  assert_eq(r.segs[1].count, 1)
+    assert_eq(r.segs[2].key, "b"); assert_eq(r.segs[2].x, 30, "20 de la celda de 'a' + 10 de hueco")
+    assert_eq(r.segs[2].first, 2); assert_eq(r.segs[2].count, 2)
+  end)
+
+  it("una fila donde empieza un segmento mide rótulo + celda y baja sus celdas", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ seg("a") }, segOpts())
+    assert_eq(L.rows[1].height, 26, "6 de rótulo + 20 de celda")
+    assert_eq(L.rows[1].cellY, 6)
+    assert_true(L.rows[1].segs[1].label)
+    assert_eq(L.contentHeight, 26)
+  end)
+
+  it("el segmento que no cabe en lo que queda de fila abre fila nueva", function()
+    local W = helper.loadWeave()
+    -- a(1) en x0..20, b(1) en x30..50; c(3) pediría x60..120 > 100 → fila nueva
+    local L = W._flowLayout({ seg("a"), seg("b"), seg("c"), seg("c"), seg("c") }, segOpts())
+    assert_eq(#L.rows, 2)
+    assert_eq(#L.rows[1].segs, 2)
+    assert_eq(L.rows[2].y, 26)
+    assert_eq(L.rows[2].segs[1].key, "c"); assert_eq(L.rows[2].segs[1].x, 0)
+    assert_eq(L.rows[2].segs[1].count, 3)
+  end)
+
+  it("justo al borde cabe (x + ancho == width)", function()
+    local W = helper.loadWeave()
+    -- sin hueco: a 0..40, b 40..80, c 80..100 → los tres en una fila
+    local L = W._flowLayout({ seg("a"), seg("a"), seg("b"), seg("b"), seg("c") },
+      segOpts({ segmentGap = 0 }))
+    assert_eq(#L.rows, 1)
+    assert_eq(L.rows[1].segs[3].x, 80)
+  end)
+
+  it("un segmento más ancho que una fila envuelve desde x=0; rótulo solo en el 1er tramo", function()
+    local W = helper.loadWeave()
+    local items = {}
+    for i = 1, 7 do items[i] = seg("big") end
+    local L = W._flowLayout(items, segOpts())
+    assert_eq(#L.rows, 2)
+    assert_eq(L.rows[1].segs[1].count, 5); assert_true(L.rows[1].segs[1].label)
+    assert_eq(L.rows[1].segs[1].total, 7, "total = entradas de todo el segmento")
+    assert_eq(L.rows[1].height, 26)
+    assert_eq(L.rows[2].segs[1].count, 2); assert_eq(L.rows[2].segs[1].x, 0)
+    assert_false(L.rows[2].segs[1].label, "la continuación no repite rótulo")
+    assert_eq(L.rows[2].height, 20, "fila de continuación: solo la celda")
+    assert_eq(L.rows[2].cellY, 0)
+  end)
+
+  it("tras un segmento envuelto, el siguiente sigue en línea en su último tramo", function()
+    local W = helper.loadWeave()
+    local items = {}
+    for i = 1, 6 do items[i] = seg("big") end -- 5 + 1
+    items[7] = seg("x")
+    local L = W._flowLayout(items, segOpts())
+    assert_eq(#L.rows, 2)
+    local r2 = L.rows[2]
+    assert_eq(#r2.segs, 2)
+    assert_eq(r2.segs[2].key, "x"); assert_eq(r2.segs[2].x, 30)
+    assert_eq(r2.height, 26, "en la fila 2 EMPIEZA 'x' → lleva rótulo")
+    assert_eq(r2.cellY, 6, "y la cola de 'big' baja con ella (celdas alineadas)")
+  end)
+
+  it("la misma clave NO consecutiva son dos segmentos", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ seg("a"), seg("b"), seg("a") }, segOpts())
+    assert_eq(#L.rows[1].segs, 3)
+  end)
+
+  it("pasar de entradas sin clave a con clave cierra la fila (y al revés)", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ item(20), item(20), seg("a"), item(20) }, segOpts())
+    assert_eq(#L.rows, 3)
+    assert_eq(L.rows[1].count, 2); assert_eq(L.rows[1].segs, nil, "fila clásica: sin segs")
+    assert_eq(L.rows[2].segs[1].key, "a")
+    assert_eq(L.rows[3].count, 1); assert_eq(L.rows[3].segs, nil)
+  end)
+
+  it("una cabecera ancho completo sigue rompiendo la fila", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ seg("a"), header(10), seg("b") }, segOpts())
+    assert_eq(#L.rows, 3)
+    assert_eq(L.rows[2].height, 10)
+  end)
+
+  it("con sangría el segmento usa el ancho de SU banda", function()
+    local W = helper.loadWeave()
+    local function sseg(key) local d = seg(key); d.indent = 30; d.columns = 3; return d end
+    -- banda = 100 - 30 = 70: a(1) 0..20, b(2) 30..70 cabe; c(1) 80..100 > 70 → nueva fila
+    local L = W._flowLayout({ sseg("a"), sseg("b"), sseg("b"), sseg("c") }, segOpts())
+    assert_eq(#L.rows, 2)
+    assert_eq(L.rows[1].indent, 30)
+    assert_eq(#L.rows[1].segs, 2)
+    assert_eq(L.rows[2].segs[1].key, "c")
+  end)
+
+  it("sin ninguna clave el resultado es idéntico al de siempre (y sin segs)", function()
+    local W = helper.loadWeave()
+    local L = W._flowLayout({ item(20), item(20), item(20) }, segOpts({ columns = 2 }))
+    assert_eq(#L.rows, 2)
+    assert_eq(L.rows[1].count, 2)
+    assert_eq(L.rows[1].segs, nil)
+    assert_eq(L.rows[1].height, 20)
+    assert_eq(L.contentHeight, 40)
+  end)
+
+end)
+
+-- Weave.flowPlan(list, opts): el MISMO algoritmo que pinta la ui, expuesto para que el
+-- consumidor estime alturas ("fit" de Coffer) sin instancia. Recibe las MISMAS opts que
+-- Weave.virtual heterogéneo (viewport, columns, padding*, spacing, typeOf, types,
+-- indentOf, segmentOf, segmentGap, segmentLabel.height); opts.width pisa viewport[1]
+-- para simular otro ancho. Devuelve { rows, contentHeight }.
+describe("Weave.flowPlan: el planificador público", function()
+
+  local function plainTypes()
+    return {
+      item   = { grid = true, height = 20, render = function() end },
+      header = { height = 10, render = function() end },
+    }
+  end
+  local function typeOf(e) return e.kind end
+
+  it("aplica types/typeOf/columns/padding igual que el virtual", function()
+    local W = helper.loadWeave()
+    local list = { { kind = "header" }, { kind = "item" }, { kind = "item" }, { kind = "item" } }
+    local P = W.flowPlan(list, {
+      viewport = { 60, 100 }, columns = 2, padding = 4, typeOf = typeOf, types = plainTypes(),
+    })
+    assert_eq(#P.rows, 3, "cabecera + 2 filas de grid (3 ítems en 2 columnas)")
+    assert_eq(P.rows[1].y, 4, "padTop")
+    assert_eq(P.contentHeight, 4 + 10 + 20 + 20 + 4)
+  end)
+
+  it("segmentOf + segmentGap + segmentLabel.height empaquetan como la ui", function()
+    local W = helper.loadWeave()
+    local list = {
+      { kind = "item", s = "a" }, { kind = "item", s = "b" },
+      { kind = "item", s = "c" }, { kind = "item", s = "c" }, { kind = "item", s = "c" },
+    }
+    local P = W.flowPlan(list, {
+      viewport = { 100, 200 }, columns = 5, typeOf = typeOf, types = plainTypes(),
+      segmentOf = function(e) return e.s end, segmentGap = 10,
+      segmentLabel = { height = 6, render = function() end },
+    })
+    assert_eq(#P.rows, 2)
+    assert_eq(P.rows[1].segs[2].x, 30)
+    assert_eq(P.contentHeight, 52)
+  end)
+
+  it("opts.width simula otro ancho sin tocar las opts del virtual", function()
+    local W = helper.loadWeave()
+    local list = {}
+    for i = 1, 6 do list[i] = { kind = "item" } end
+    local o = { viewport = { 60, 100 }, columns = 3, typeOf = typeOf, types = plainTypes() }
+    assert_eq(W.flowPlan(list, o).contentHeight, 40)
+    o.width, o.columns = 120, 6
+    assert_eq(W.flowPlan(list, o).contentHeight, 20)
+  end)
+
+  it("indentOf baja columnas por banda, igual que el virtual", function()
+    local W = helper.loadWeave()
+    local list = {}
+    for i = 1, 4 do list[i] = { kind = "item" } end
+    local P = W.flowPlan(list, {
+      viewport = { 60, 100 }, columns = 3, typeOf = typeOf, types = plainTypes(),
+      indentOf = function() return 20 end, -- (60-20)/20 = 2 columnas
+    })
+    assert_eq(#P.rows, 2)
+    assert_eq(P.rows[1].count, 2)
+  end)
+
+  it("valida lo mismo que el virtual: typeOf desconocido → error claro", function()
+    local W = helper.loadWeave()
+    assert_error(function()
+      W.flowPlan({ { kind = "nope" } }, {
+        viewport = { 60, 100 }, typeOf = typeOf, types = plainTypes(),
+      })
+    end, "unknown type")
+    assert_error(function() W.flowPlan({}, { viewport = { 60, 100 } }) end, "types")
+  end)
+
+end)
