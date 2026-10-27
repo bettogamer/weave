@@ -102,10 +102,21 @@ local flush -- forward declaration
 
 -- Enqueues the observers of `node` after its value changed. `skip` avoids re-scheduling
 -- the observer that is pulling the fresh value right now.
+--
+-- A computed NOBODY observes right now is not recomputed (FR Coffer 2026-09-02,
+-- ADR-0012): it goes dirty in O(1) and drops its own deps — being dirty already, it
+-- needs no further notices, and the next read recomputes against the CURRENT values.
+-- Dropping the deps is what lets the laziness climb a chain (A → B): once B lets go,
+-- A has no observers either. Decided here, at notify time, and never when an observer
+-- untracks: an effect untracks ALL its deps at the start of every run and re-tracks
+-- them during it, so "lost its last observer" mid-run would dirty everything it reads.
 local function scheduleObservers(node, skip)
   for obs in pairs(node._observers) do
     if obs ~= skip then
-      if obs._isComputed then
+      if obs._isComputed and next(obs._observers) == nil and not obs._computing then
+        obs._dirty = true
+        untrackDeps(obs) -- clears node._observers[obs] mid-traversal: allowed by next()
+      elseif obs._isComputed then
         obs._dirty = true
         if not cQueued[obs] then
           cQueued[obs] = true
