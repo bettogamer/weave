@@ -37,6 +37,10 @@ local pct = Weave.computed(function() return hp() / hpMax() end)
 
 - `opts.fallback` — valor expuesto si `fn` degrada por secrets (§3).
 - Los computeds pueden leer otros computeds (grafo). Ciclos → error claro en dev.
+- **Sin observadores no trabaja** (v0.10, ADR-0012): si una dependencia cambia y nadie (ni effect
+  ni otro computed observado) lo está leyendo, queda **sucio** y suelta sus deps, sin recalcular;
+  la siguiente lectura (`c()` / `c:peek()`) lo pone al día con el valor actual. La pereza sube por
+  las cadenas. Un error de su fórmula aflora en esa lectura, no en el `set()` de la dependencia.
 
 ### `Weave.effect(fn) → EffectHandle`
 
@@ -441,6 +445,12 @@ W.new("Frame", {
 - **Degradación taint (ADR-0003):** un dato secreto fluye a los sinks que lo aceptan; su lectura
   numérica se marca ("??"); nunca un popup. Mismo criterio que `each`.
 - **Disposal:** adscrito al scope activo; `dispose()` libera binds del pool y oculta los frames.
+- **Duerme cuando no se ve** (FR Coffer 2026-09-02, v0.10, ADR-0012) — automático, sin opts: se
+  engancha con `HookScript` a `OnShow`/`OnHide` del viewport (también salta al ocultarse un
+  ancestro) y mira `IsVisible()`. Oculto, no lee fuente, scroll ni geometría — ni replanifica ni
+  repinta, y con la pereza de `computed` (§1) tampoco corre el pipeline del stream si nadie más lo
+  lee. Al mostrarse, una pasada contra los valores **actuales**. La primera pasada se hace siempre;
+  mientras duerme, `contentHeight()` es la última foto (para estimar, `Weave.flowPlan`).
 - **Filas heterogéneas (Fase 2, v0.7+):** para intercalar **cabeceras de grupo** con los ítems en
   el mismo stream virtualizado, en vez de `render`/`rowHeight` se pasa `opts.typeOf(entry) → tipo`
   + `opts.types = { [tipo] = { render = fn, height = N, grid = bool } }`:
@@ -477,6 +487,29 @@ W.new("Frame", {
     - Las filas de **ancho completo también se insetan** (x + `indent`, ancho − `indent`), así
       que una sub-cabecera cuelga alineada con sus propios ítems.
     - Requiere modo heterogéneo (`opts.types`). Default 0 → sin cambio de comportamiento.
+  - **Segmentos en línea** (FR Coffer 2026-10-26, v0.10, ADR-0012): sub-grupos que comparten fila,
+    cada uno un bloque = **rótulo encima** + sus celdas.
+    ```lua
+    segmentOf  = function(e) return e.bind end,     -- consecutivas con la misma clave = segmento; nil = como siempre
+    segmentGap = 8,                                 -- px libres entre segmentos (el separador lo pintas tú)
+    segmentLabel = { height = 16, render = function(info)  -- UNA vez por marco del pool de rótulos
+      return W.new("Button", { text = W.computed(function()
+        local v = info(); return v and v.key or "" end) })
+    end },
+    ```
+    - Empaquetado en px contra la banda (ancho útil − sangría): un segmento va a `segmentGap` del
+      anterior; si no cabe en lo que queda de fila, abre fila; si es más ancho que la fila,
+      envuelve desde x=0 con rótulo solo en el primer tramo. Una fila donde **empieza** algún
+      segmento mide `segmentLabel.height + celda` (todas sus celdas bajan); las de continuación,
+      solo la celda. Cabeceras, cambios de sangría y pasar de sin clave a con clave cierran fila.
+    - `info` es una señal `{ key, entry, first, count, width }`: `entry` = primera entrada del
+      segmento, `count` = sus entradas totales, `width` = px del tramo rotulado. `virtual` fija
+      tamaño (`width × height`) y posición del rótulo. Pool propio O(visible), diferido en combate.
+    - `segmentLabel` requiere `segmentOf`; `segmentOf` requiere `opts.types`.
+  - **`Weave.flowPlan(list, opts) → { rows, contentHeight }`** (v0.10): el plan EXACTO que pintaría
+    un `virtual` heterogéneo, sin instancia — mismas opts (`viewport`, `columns`, `padding*`,
+    `spacing`, `typeOf`, `types`, `indentOf`, `segment*`); `opts.width` simula otro ancho. Para
+    dimensionar una ventana por su contenido ("fit"): comparte código con la ui, no puede divergir.
   - **El colapso lo posee el consumidor** (ADR-0010): `virtual` es un motor de ventana sobre un
     stream plano — no sabe qué es un "grupo". Colapsar = poner un stream nuevo sin los ítems de ese
     grupo (el `render` de la cabecera trae la flecha + un click que re-setea la señal del stream).
